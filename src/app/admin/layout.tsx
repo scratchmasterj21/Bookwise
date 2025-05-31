@@ -1,20 +1,22 @@
+
 "use client";
 import AuthGuard from '@/components/auth/AuthGuard';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode } from 'react';
-import { ListChecks, HardDrive, Building2, Settings } from 'lucide-react';
+import { ListChecks, HardDrive, Building, Settings, Warehouse } from 'lucide-react'; // Added Warehouse for Buildings
 
 const adminTabs = [
   { name: 'Manage Reservations', href: '/admin', icon: ListChecks },
   { name: 'Manage Devices', href: '/admin/devices', icon: HardDrive },
-  { name: 'Manage Rooms', href: '/admin/rooms', icon: Building2 },
+  { name: 'Manage Rooms', href: '/admin/rooms', icon: Building },
+  { name: 'Manage Buildings', href: '/admin/buildings', icon: Warehouse }, // New tab for Buildings
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const activeTabValue = adminTabs.find(tab => pathname === tab.href)?.href || '/admin';
+  const activeTabValue = adminTabs.find(tab => pathname.startsWith(tab.href))?.href || '/admin';
 
   return (
     <AuthGuard adminOnly={true}>
@@ -25,7 +27,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </h1>
         </div>
         <Tabs value={activeTabValue} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:max-w-lg">
+          <TabsList className="grid w-full grid-cols-4 md:max-w-xl"> {/* Adjusted for 4 tabs */}
             {adminTabs.map((tab) => (
               <TabsTrigger key={tab.href} value={tab.href} asChild>
                 <Link href={tab.href} className="flex items-center gap-2">
