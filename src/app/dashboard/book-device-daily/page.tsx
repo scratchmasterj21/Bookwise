@@ -20,7 +20,7 @@ import { TIME_PERIODS } from '@/lib/constants';
 export default function BookDeviceDailyPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [devices, setDevices] = useState<Device[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -34,15 +34,15 @@ export default function BookDeviceDailyPage() {
     try {
       const [fetchedDevices, fetchedReservations] = await Promise.all([
         fetchDevicesFromDB(),
-        fetchReservationsFromDB() 
+        fetchReservationsFromDB()
       ]);
       const bookableDevices = fetchedDevices.filter(device => device.status === 'available' && device.quantity > 0);
-      setDevices(bookableDevices); 
+      setDevices(bookableDevices);
       setReservations(fetchedReservations.filter(r => r.itemType === 'device'));
     } catch (error) {
       console.error("Error fetching data for daily device booking page:", error);
       toast({ title: "Error", description: "Could not load devices or reservations.", variant: "destructive" });
-      setDevices([]); 
+      setDevices([]);
       setReservations([]);
     } finally {
       setIsLoading(false);
@@ -50,7 +50,7 @@ export default function BookDeviceDailyPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!authLoading) { 
+    if (!authLoading) {
         fetchData();
     }
   }, [authLoading, fetchData]);
@@ -62,10 +62,11 @@ export default function BookDeviceDailyPage() {
     endTime: Date;
     devicePurposes?: string[];
     notes?: string;
+    bookedQuantity?: number; // Added
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
-      throw new Error("User not logged in"); 
+      throw new Error("User not logged in");
     }
     setIsProcessingGlobal(true);
     const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -74,40 +75,41 @@ export default function BookDeviceDailyPage() {
       userEmail: user.email || undefined,
       itemId: bookingDetails.itemId,
       itemName: bookingDetails.itemName,
-      itemType: 'device', 
+      itemType: 'device',
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
-      status: 'approved', 
+      status: 'approved',
       devicePurposes: bookingDetails.devicePurposes,
       notes: bookingDetails.notes,
+      bookedQuantity: bookingDetails.bookedQuantity || 1, // Use provided or default to 1
       bookedBy: user.displayName || user.email || "User",
     };
 
     try {
       const addedReservation = await addReservation(newReservationData);
-      setReservations(prev => [...prev, addedReservation]); 
+      setReservations(prev => [...prev, addedReservation]);
       toast({
         title: 'Device Booked!',
-        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}.`,
+        description: `${bookingDetails.itemName} (Qty: ${newReservationData.bookedQuantity}) booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}.`,
       });
     } catch (error) {
        console.error("Error creating device reservation:", error);
        toast({ title: "Booking Failed", description: "Could not create device reservation. Please try again.", variant: "destructive"});
-       throw error; 
+       throw error;
     } finally {
         setIsProcessingGlobal(false);
     }
   };
 
-  const handleUpdateSlot = async (reservationId: string, newDetails: { devicePurposes?: string[], notes?: string }) => {
+  const handleUpdateSlot = async (reservationId: string, newDetails: { devicePurposes?: string[], notes?: string, bookedQuantity?: number }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
       throw new Error("User not logged in");
     }
     setIsProcessingGlobal(true);
     try {
-      await updateReservation(reservationId, newDetails); 
-      setReservations(prev => 
+      await updateReservation(reservationId, newDetails);
+      setReservations(prev =>
         prev.map(res => res.id === reservationId ? { ...res, ...newDetails } : res)
       );
       toast({
@@ -144,7 +146,7 @@ export default function BookDeviceDailyPage() {
       setReservationToDelete(null);
     }
   };
-  
+
   if (authLoading || (isLoading && devices.length === 0)) {
      return (
         <div className="space-y-4">
@@ -156,7 +158,7 @@ export default function BookDeviceDailyPage() {
         </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -189,7 +191,7 @@ export default function BookDeviceDailyPage() {
           </Popover>
         </div>
       </div>
-      
+
       {(!isLoading && devices.length === 0) ? (
          <p className="text-muted-foreground text-center mt-6">
             No devices currently available for booking.
@@ -197,10 +199,10 @@ export default function BookDeviceDailyPage() {
       ) : isLoading ? (
          <Skeleton className="h-[500px] w-full" />
       ) : (
-        <DailyBookingTable 
+        <DailyBookingTable
           selectedDate={selectedDate}
-          items={devices} 
-          itemType="device" 
+          items={devices}
+          itemType="device"
           reservations={reservations}
           onBookSlot={handleBookSlot as any}
           onUpdateSlot={handleUpdateSlot as any}

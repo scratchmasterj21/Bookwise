@@ -30,7 +30,7 @@ type Item = Room | Device;
 
 interface DailyBookingTableProps {
   selectedDate: Date;
-  items: Item[]; 
+  items: Item[];
   itemType: 'room' | 'device';
   reservations: Reservation[];
   onBookSlot: (bookingDetails: {
@@ -38,16 +38,22 @@ interface DailyBookingTableProps {
     itemName: string;
     startTime: Date;
     endTime: Date;
-    purpose?: string; // For rooms
-    devicePurposes?: string[]; // For devices
-    notes?: string; // For devices
+    purpose?: string;
+    devicePurposes?: string[];
+    notes?: string;
+    bookedQuantity?: number; // Added
   }) => Promise<void>;
-  onUpdateSlot: (reservationId: string, newDetails: { purpose?: string; devicePurposes?: string[]; notes?: string }) => Promise<void>;
+  onUpdateSlot: (reservationId: string, newDetails: {
+    purpose?: string;
+    devicePurposes?: string[];
+    notes?: string;
+    bookedQuantity?: number; // Added
+  }) => Promise<void>;
   onDeleteSlot: (reservationId: string) => void;
   periods: TimePeriod[];
   isProcessingGlobal?: boolean;
   itemDisplayName?: string;
-  bookingModalPurposeLabel?: string; 
+  bookingModalPurposeLabel?: string;
 }
 
 interface CellDisplayInfo {
@@ -55,20 +61,21 @@ interface CellDisplayInfo {
   isPast: boolean;
   displayText?: string;
   bookedBy?: string;
-  purpose?: string; 
-  devicePurposes?: string[]; 
-  notes?: string; 
+  purpose?: string;
+  devicePurposes?: string[];
+  notes?: string;
+  bookedQuantity?: number; // Added
   itemName?: string;
   isCurrentUserBooking?: boolean;
-  mainReservation?: Reservation; 
-  bookedCount?: number;
-  itemQuantity?: number;
+  mainReservation?: Reservation; // Represents one of the bookings if multiple for devices
+  bookedUnits?: number; // Total units booked for this device in this slot
+  itemTotalQuantity?: number; // Total quantity of this device
 }
 
 interface ItemStyling {
   borderClass: string;
   textClass: string;
-  backgroundClass: string; 
+  backgroundClass: string;
   icon?: React.ElementType;
 }
 
@@ -128,7 +135,7 @@ const getIconForItemType = (itemTypeProp: 'room' | 'device', deviceDetail?: Devi
         default: return Package;
     }
   }
-  return undefined; 
+  return undefined;
 };
 
 
@@ -143,7 +150,7 @@ export default function DailyBookingTable({
   periods,
   isProcessingGlobal = false,
   itemDisplayName = "Item",
-  bookingModalPurposeLabel = "Purpose/Notes" 
+  bookingModalPurposeLabel = "Purpose/Notes"
 }: DailyBookingTableProps) {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -151,13 +158,14 @@ export default function DailyBookingTable({
   const [isSlotProcessing, setIsSlotProcessing] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [currentBookingSlot, setCurrentBookingSlot] = useState<{item: Item, period: TimePeriod, existingReservation?: Reservation} | null>(null);
-  
-  const [bookingPurpose, setBookingPurpose] = useState(''); 
-  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); 
-  const [bookingNotes, setBookingNotes] = useState(''); 
+
+  const [bookingPurpose, setBookingPurpose] = useState('');
+  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]);
+  const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingQuantity, setBookingQuantity] = useState<number>(1); // For device quantity
 
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
-  const [hoveredSlot, setHoveredSlot] = useState<string | null>(null); 
+  const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookingModalOpen) {
@@ -165,11 +173,12 @@ export default function DailyBookingTable({
         setBookingPurpose('');
         setSelectedDevicePurposes([]);
         setBookingNotes('');
+        setBookingQuantity(1);
     }
   }, [bookingModalOpen]);
 
   const handleDevicePurposeChange = (purpose: string) => {
-    setSelectedDevicePurposes(prev => 
+    setSelectedDevicePurposes(prev =>
       prev.includes(purpose) ? prev.filter(p => p !== purpose) : [...prev, purpose]
     );
   };
@@ -182,9 +191,9 @@ export default function DailyBookingTable({
       if (res.itemId !== item.id || res.itemType !== itemType) return false;
       const reservationStart = new Date(res.startTime);
       const reservationEnd = new Date(res.endTime);
-      return isSameDay(reservationStart, targetDate) && 
-             reservationStart < periodEndDateTime && 
-             reservationEnd > periodStartDateTime && 
+      return isSameDay(reservationStart, targetDate) &&
+             reservationStart < periodEndDateTime &&
+             reservationEnd > periodStartDateTime &&
              res.status !== 'cancelled' && res.status !== 'rejected';
     });
   };
@@ -203,7 +212,7 @@ export default function DailyBookingTable({
         toast({title: "Past Slot", description: "This slot cannot be booked."});
         return;
     }
-    
+
     if (actionType === 'edit' && existingReservation) {
       const canManageBooking = isAdmin || existingReservation.userId === user.uid;
       if (!canManageBooking) {
@@ -216,6 +225,7 @@ export default function DailyBookingTable({
       } else {
         setSelectedDevicePurposes(existingReservation.devicePurposes || []);
         setBookingNotes(existingReservation.notes || '');
+        setBookingQuantity(existingReservation.bookedQuantity || 1);
       }
       setEditingReservationId(existingReservation.id);
     } else if (actionType === 'book') {
@@ -223,6 +233,7 @@ export default function DailyBookingTable({
       setBookingPurpose('');
       setSelectedDevicePurposes([]);
       setBookingNotes('');
+      setBookingQuantity(1);
       setEditingReservationId(null);
     }
     setBookingModalOpen(true);
@@ -237,38 +248,32 @@ export default function DailyBookingTable({
     const endTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.end.split(':')[0])), parseInt(period.end.split(':')[1])),0),0);
 
     try {
-      if (editingReservationId) {
-        const updateDetails: { purpose?: string; devicePurposes?: string[]; notes?: string } = {};
-        if (itemType === 'room') {
-          updateDetails.purpose = bookingPurpose.trim();
-        } else {
-          updateDetails.devicePurposes = selectedDevicePurposes;
-          updateDetails.notes = bookingNotes.trim();
-        }
-        await onUpdateSlot(editingReservationId, updateDetails);
+      const details: any = {
+        itemId: item.id,
+        itemName: item.name,
+        startTime,
+        endTime,
+      };
+      if (itemType === 'room') {
+        details.purpose = bookingPurpose.trim();
       } else {
-        const bookingDetails: any = {
-            itemId: item.id,
-            itemName: item.name,
-            startTime,
-            endTime,
-        };
-        if (itemType === 'room') {
-            bookingDetails.purpose = bookingPurpose.trim();
-        } else {
-            bookingDetails.devicePurposes = selectedDevicePurposes;
-            bookingDetails.notes = bookingNotes.trim();
-        }
-        await onBookSlot(bookingDetails);
+        details.devicePurposes = selectedDevicePurposes;
+        details.notes = bookingNotes.trim();
+        details.bookedQuantity = bookingQuantity;
+      }
+
+      if (editingReservationId) {
+        await onUpdateSlot(editingReservationId, details);
+      } else {
+        await onBookSlot(details);
       }
     } catch (error) {
-      // Error toast handled by parent
     } finally {
       setIsSlotProcessing(false);
       setBookingModalOpen(false);
     }
   };
-  
+
   const getCellDisplayData = (item: Item, period: TimePeriod): CellDisplayInfo => {
     const slotStartDateTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.start.split(':')[0])), parseInt(period.start.split(':')[1])),0),0);
     const isPast = isBefore(new Date(), slotStartDateTime) && !isSameDay(new Date(), slotStartDateTime) ? false : isBefore(slotStartDateTime, new Date());
@@ -277,26 +282,25 @@ export default function DailyBookingTable({
 
     if (itemType === 'device') {
       const device = item as Device;
-      const bookedCount = slotReservations.length;
-      const availableQuantity = device.quantity - bookedCount;
-      const firstReservation = slotReservations[0];
+      const totalBookedUnits = slotReservations.reduce((sum, res) => sum + (res.bookedQuantity || 1), 0);
+      const availableQuantity = device.quantity - totalBookedUnits;
+      const firstReservation = slotReservations.find(r => r.userId === user?.uid) || slotReservations[0]; // Prioritize current user's booking for display
 
       if (isPast) {
-        if (bookedCount > 0) return {
-            status: 'past-booked', isPast: true, bookedBy: firstReservation?.bookedBy, devicePurposes: firstReservation?.devicePurposes, notes: firstReservation?.notes, itemName: device.name, isCurrentUserBooking: firstReservation?.userId === user?.uid, mainReservation: firstReservation, bookedCount, itemQuantity: device.quantity
+        if (totalBookedUnits > 0) return {
+            status: 'past-booked', isPast: true, bookedBy: firstReservation?.bookedBy, devicePurposes: firstReservation?.devicePurposes, notes: firstReservation?.notes, bookedQuantity: firstReservation?.bookedQuantity, itemName: device.name, isCurrentUserBooking: !!slotReservations.find(r=>r.userId === user?.uid), mainReservation: firstReservation, bookedUnits: totalBookedUnits, itemTotalQuantity: device.quantity
         };
         return { status: 'past-available', isPast: true, itemName: device.name, displayText: "" };
       }
       if (availableQuantity <= 0) {
-        return { status: 'all-booked', isPast: false, itemName: device.name, displayText: "Fully Booked", bookedBy: firstReservation?.bookedBy, devicePurposes: firstReservation?.devicePurposes, notes: firstReservation?.notes, isCurrentUserBooking: firstReservation?.userId === user?.uid, mainReservation: firstReservation, bookedCount, itemQuantity: device.quantity };
+        return { status: 'all-booked', isPast: false, itemName: device.name, displayText: "Fully Booked", bookedBy: firstReservation?.bookedBy, devicePurposes: firstReservation?.devicePurposes, notes: firstReservation?.notes, bookedQuantity: firstReservation?.bookedQuantity, isCurrentUserBooking: !!slotReservations.find(r=>r.userId === user?.uid), mainReservation: firstReservation, bookedUnits: totalBookedUnits, itemTotalQuantity: device.quantity };
       }
-      if (bookedCount > 0) {
-        return { status: 'booked', isPast: false, bookedBy: firstReservation?.bookedBy, devicePurposes: firstReservation?.devicePurposes, notes: firstReservation?.notes, itemName: device.name, isCurrentUserBooking: firstReservation?.userId === user?.uid, mainReservation: firstReservation, displayText: `${availableQuantity} left`, bookedCount, itemQuantity: device.quantity };
+      if (totalBookedUnits > 0) {
+        return { status: 'booked', isPast: false, bookedBy: firstReservation?.bookedBy, devicePurposes: firstReservation?.devicePurposes, notes: firstReservation?.notes, bookedQuantity: firstReservation?.bookedQuantity, itemName: device.name, isCurrentUserBooking: !!slotReservations.find(r=>r.userId === user?.uid), mainReservation: firstReservation, displayText: `${availableQuantity} left`, bookedUnits: totalBookedUnits, itemTotalQuantity: device.quantity };
       }
-      return { status: 'available', isPast: false, itemName: device.name, displayText: `Available (${device.quantity})` };
+      return { status: 'available', isPast: false, itemName: device.name, displayText: `Available (${device.quantity})`, itemTotalQuantity: device.quantity };
     }
 
-    // Room logic
     const mainReservation = slotReservations[0];
     if (isPast) {
         if (mainReservation) return {
@@ -318,16 +322,16 @@ export default function DailyBookingTable({
     if (cellData.isPast) {
         if (cellData.status === 'past-booked') {
             baseClasses = cn(baseClasses, `bg-slate-100 ${itemStyling.borderClass} border-dashed opacity-60 cursor-default`);
-        } else { 
+        } else {
             baseClasses = cn(baseClasses, "bg-slate-50 border-slate-200 border-dashed cursor-default");
         }
-    } else { 
+    } else {
         if (cellData.status === 'booked' || (cellData.status === 'all-booked' && itemType === 'device')) {
             const bgClass = cellData.isCurrentUserBooking ? 'bg-green-50' : itemStyling.backgroundClass;
             baseClasses = cn(baseClasses, `${bgClass} ${itemStyling.borderClass} border-2`, "cursor-pointer");
         } else if (cellData.status === 'available') {
             baseClasses = cn(baseClasses, "bg-background hover:bg-primary/10 border-slate-200 cursor-pointer transition-colors duration-150");
-        } else if (cellData.status === 'all-booked' && itemType === 'room') { 
+        } else if (cellData.status === 'all-booked' && itemType === 'room') {
             baseClasses = cn(baseClasses, "bg-red-50 text-red-700 border-red-300 cursor-not-allowed", itemStyling.borderClass);
         }
     }
@@ -339,26 +343,26 @@ export default function DailyBookingTable({
     if (isProcessingGlobal || isSlotProcessing) return;
 
     if (cellData.isPast) {
-      if(cellData.mainReservation) { 
+      if(cellData.mainReservation) {
         toast({
             title: "Past Booking",
-            description: `${cellData.itemName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || cellData.devicePurposes?.join(', ') || cellData.notes || 'N/A'}`
+            description: `${cellData.itemName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || cellData.devicePurposes?.join(', ') || 'N/A'}${itemType === 'device' ? ` (Qty: ${cellData.bookedQuantity || 1})` : ''}${cellData.notes ? `. Notes: ${cellData.notes}` : ''}`
         });
-      } else { 
+      } else {
         toast({ title: "Past Slot", description: "This slot cannot be booked."});
       }
       return;
     }
-    
+
     const canManageBooking = isAdmin || cellData.isCurrentUserBooking;
 
     if (cellData.mainReservation && (cellData.status === 'booked' || (cellData.status === 'all-booked' && itemType === 'device'))) {
         if (canManageBooking) {
             handleSlotAction(item, period, 'edit', cellData.mainReservation);
-        } else { 
+        } else {
              toast({
                 title: "Booking Details",
-                description: `${cellData.itemName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || cellData.devicePurposes?.join(', ') || cellData.notes || 'N/A'}`
+                description: `${cellData.itemName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || cellData.devicePurposes?.join(', ') || 'N/A'}${itemType === 'device' ? ` (Qty: ${cellData.bookedQuantity || 1})` : ''}${cellData.notes ? `. Notes: ${cellData.notes}` : ''}`
             });
         }
     } else if (cellData.status === 'available') {
@@ -368,14 +372,29 @@ export default function DailyBookingTable({
     }
   };
 
+  const getMaxBookableQuantity = () => {
+    if (!currentBookingSlot || itemType !== 'device') return 1;
+    const { item, period, existingReservation } = currentBookingSlot;
+    const device = item as Device;
+    const reservationsInSlot = getReservationsForSlot(device, period, selectedDate);
+    let totalBookedByOthers = 0;
+    reservationsInSlot.forEach(res => {
+      if (res.id !== existingReservation?.id) {
+        totalBookedByOthers += (res.bookedQuantity || 1);
+      }
+    });
+    const maxQty = device.quantity - totalBookedByOthers;
+    return Math.max(0, maxQty); // Can be 0 if fully booked by others
+  };
+
+
   const isBookingButtonDisabled = () => {
     if (isSlotProcessing || isProcessingGlobal) return true;
     if (itemType === 'room' && !bookingPurpose.trim()) return true;
-    if (itemType === 'device' && selectedDevicePurposes.length === 0) return true;
-    if (itemType === 'device' && currentBookingSlot && !editingReservationId) {
-        const device = currentBookingSlot.item as Device;
-        const reservationsForSlot = getReservationsForSlot(device, currentBookingSlot.period, selectedDate);
-        if (device.quantity - reservationsForSlot.length <= 0) return true;
+    if (itemType === 'device') {
+        if (selectedDevicePurposes.length === 0) return true;
+        if (bookingQuantity < 1 || bookingQuantity > getMaxBookableQuantity()) return true;
+        if (!editingReservationId && getMaxBookableQuantity() === 0) return true; // Cannot book if 0 available for new booking
     }
     return false;
   };
@@ -388,7 +407,7 @@ export default function DailyBookingTable({
           <table className="w-full border-collapse text-sm min-w-[900px]">
             <thead>
               <tr className="bg-muted">
-                <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[200px]">{itemDisplayName}</th>
+                <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[250px]">{itemDisplayName}</th>
                 {periods.map(period => (
                   <th key={period.name} className={cn(
                       "p-2 border-b border-r text-center min-w-[120px] font-semibold text-foreground align-middle h-16",
@@ -401,7 +420,7 @@ export default function DailyBookingTable({
             <tbody>
               {items.map(item => (
                 <tr key={item.id} className="even:bg-background odd:bg-muted/20">
-                  <td className="p-2 border-r text-left sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[200px] whitespace-nowrap">
+                  <td className="p-2 border-r text-left sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[250px] whitespace-nowrap">
                      <div className="flex items-center gap-2">
                         {getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name) &&
                            React.createElement(getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name)!, { className: "h-5 w-5 text-primary"})}
@@ -414,7 +433,7 @@ export default function DailyBookingTable({
                     const slotKey = `${item.id}-${period.name}`;
                     const cellData = getCellDisplayData(item, period);
                     const itemStyling = getItemStyling(item, itemType);
-                    
+
                     const canManageBooking = isAdmin || cellData.isCurrentUserBooking;
                     const showActions = canManageBooking && cellData.mainReservation && !cellData.isPast && hoveredSlot === slotKey;
 
@@ -429,12 +448,12 @@ export default function DailyBookingTable({
                         <div className="h-full w-full flex flex-col relative p-1.5">
                           {cellData.status === 'booked' || (cellData.status === 'all-booked' && itemType === 'device') ? (
                              <div className={cn("flex flex-col text-left w-full h-full space-y-0.5", cellData.isPast ? "opacity-60" : "")}>
-                              <div>
+                              <div className="flex-grow">
                                   <span className={cn("block font-semibold text-[10px] leading-tight", itemStyling.textClass)}>
                                       {cellData.itemName}
                                   </span>
                                   <span className="block font-semibold text-red-600 text-[10px] leading-tight">
-                                      {getLastName(cellData.bookedBy)}
+                                      {getLastName(cellData.bookedBy)} {itemType === 'device' && `(Qty: ${cellData.bookedQuantity || 1})`}
                                   </span>
                                   {itemType === 'room' && cellData.purpose &&
                                     <span className="block text-slate-700 text-[10px] leading-tight break-words whitespace-normal mt-0.5">
@@ -451,14 +470,14 @@ export default function DailyBookingTable({
                                         Notes: {cellData.notes}
                                     </span>
                                   }
-                                  {itemType === 'device' && cellData.displayText && cellData.status !== 'available' && (
-                                      <span className="block text-xs text-muted-foreground mt-0.5">
-                                          {cellData.displayText} 
+                              </div>
+                                {itemType === 'device' && cellData.displayText && cellData.status !== 'available' && (
+                                      <span className="block text-xs text-muted-foreground mt-auto self-start">
+                                          {cellData.displayText}
                                       </span>
                                   )}
-                              </div>
                             </div>
-                          ) : (cellData.status === 'available' || cellData.status === 'all-booked') && !cellData.isPast ? ( 
+                          ) : (cellData.status === 'available' || cellData.status === 'all-booked') && !cellData.isPast ? (
                               <div className="flex-grow flex flex-col items-center justify-center">
                                   <span className={cn("font-medium text-xs", cellData.status === 'available' ? "text-primary" : "text-red-600")}>{cellData.displayText}</span>
                               </div>
@@ -502,8 +521,8 @@ export default function DailyBookingTable({
                 <p><strong>{itemDisplayName}:</strong> {currentBookingSlot.item.name}</p>
                 <p><strong>Date:</strong> {format(selectedDate, 'EEEE, MMM dd, yyyy')}</p>
                 <p><strong>Period:</strong> {currentBookingSlot.period.name} ({currentBookingSlot.period.label})</p>
-                 {itemType === 'device' && 
-                    <p><strong>Available Quantity:</strong> {(currentBookingSlot.item as Device).quantity - getReservationsForSlot(currentBookingSlot.item, currentBookingSlot.period, selectedDate).filter(r => r.id !== editingReservationId).length}</p>
+                 {itemType === 'device' &&
+                    <p><strong>Max Available to Book:</strong> {getMaxBookableQuantity()}</p>
                  }
               </div>
 
@@ -523,6 +542,20 @@ export default function DailyBookingTable({
 
               {itemType === 'device' && (
                 <>
+                 <div className="space-y-1.5">
+                    <Label htmlFor="booking-quantity" className="font-medium">Quantity to Book:</Label>
+                    <Input
+                      id="booking-quantity"
+                      type="number"
+                      value={bookingQuantity}
+                      onChange={(e) => setBookingQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      min="1"
+                      max={getMaxBookableQuantity()}
+                      className="text-sm"
+                      disabled={isSlotProcessing || isProcessingGlobal || getMaxBookableQuantity() === 0 && !editingReservationId}
+                    />
+                    {bookingQuantity > getMaxBookableQuantity() && <p className="text-xs text-red-500">Quantity exceeds available units ({getMaxBookableQuantity()}).</p>}
+                  </div>
                   <div className="space-y-2">
                     <Label className="font-medium">Purpose (select all that apply):</Label>
                     <ScrollArea className="h-32 border rounded-md p-2">
@@ -576,5 +609,3 @@ export default function DailyBookingTable({
     </Card>
   );
 }
-
-    

@@ -53,17 +53,18 @@ export interface Reservation {
   userId: string;
   userName?: string;
   userEmail?: string;
-  itemId: string; 
-  itemName?: string; 
+  itemId: string;
+  itemName?: string;
   itemType: 'device' | 'room';
   startTime: Date;
   endTime: Date;
   status: ReservationStatus;
-  notes?: string; // For room details/notes OR device specific notes
-  purpose?: string; // For room's single purpose string
-  devicePurposes?: string[]; // For device's multi-select purposes
-  bookedBy?: string; 
-  createdAt?: Date | any; 
+  notes?: string;
+  purpose?: string;
+  devicePurposes?: string[];
+  bookedQuantity?: number; // Added for multi-unit device booking
+  bookedBy?: string;
+  createdAt?: Date | any;
   updatedAt?: Date | any;
 }
 
@@ -74,6 +75,6 @@ export type ReservationRequest = Omit<Reservation, 'id' | 'userId' | 'userName' 
 export interface TimePeriod {
   name: string;
   label: string;
-  start: string; 
-  end: string;   
+  start: string;
+  end: string;
 }
