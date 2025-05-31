@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +64,7 @@ export default function ItemFormDialog({
 
   // Device specific
   const [specificType, setSpecificType] = useState<DeviceType | ''>('');
+  const [quantity, setQuantity] = useState<number>(1); // Added quantity for device
 
   // Room specific
   const [capacity, setCapacity] = useState<number>(0);
@@ -103,7 +105,6 @@ export default function ItemFormDialog({
             setAmenities(r.amenities?.join(', ') || '');
             setSelectedBuildingId(r.buildingId || undefined);
             setRoomFloorNumber(r.floorNumber);
-            // If building is selected and has 1 floor, floorNumber must be 1
             const building = buildings.find(b => b.id === r.buildingId);
             if (building?.numberOfFloors === 1) {
               setRoomFloorNumber(1);
@@ -112,31 +113,27 @@ export default function ItemFormDialog({
             const d = itemData as Device;
             setSpecificType(d.type || '');
             setSelectedBuildingId(d.buildingId || undefined);
-            // selectedRoomId is handled by another useEffect
+            setQuantity(d.quantity || 1); // Set quantity for device
         }
       } else {
         setName('');
         setDescription('');
         setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
         setStatus('available');
-        // Building
         setLocation('');
         setNumberOfBuildingFloors("1");
         setNotes('');
-        // Room
         setCapacity(0);
         setAmenities('');
         setRoomFloorNumber(undefined);
-        // Device
         setSpecificType('');
-        // Common
+        setQuantity(1); // Default quantity for new device
         setSelectedBuildingId(undefined);
         setSelectedRoomId(undefined);
       }
     }
-  }, [open, itemData, itemType, buildings]); // Added buildings to dependency for room floor logic
+  }, [open, itemData, itemType, buildings]);
 
-  // Effect to handle selectedRoomId for devices based on selectedBuildingId
   useEffect(() => {
     if (open && itemType === 'device' && itemData && 'roomId' in itemData) {
         const d = itemData as Device;
@@ -155,7 +152,6 @@ export default function ItemFormDialog({
     }
   }, [open, itemData, itemType, selectedBuildingId, allRooms]);
 
-  // Effect to manage room's floor number based on selected building
   useEffect(() => {
     if (itemType === 'room') {
       const building = buildings.find(b => b.id === selectedBuildingId);
@@ -163,15 +159,12 @@ export default function ItemFormDialog({
         if (building.numberOfFloors === 1) {
           setRoomFloorNumber(1);
         } else {
-          // If building has 2 floors, and current floor is not 1 or 2, reset.
-          // Or, if no itemData (new room), default to 1 or undefined to force selection.
           if (!itemData || (itemData as Room).buildingId !== selectedBuildingId) {
-            setRoomFloorNumber(undefined); // Force selection for new building
+            setRoomFloorNumber(undefined);
           }
-          // if itemData exists and buildingId is same, r.floorNumber is already set
         }
       } else {
-        setRoomFloorNumber(undefined); // No building selected, no floor
+        setRoomFloorNumber(undefined);
       }
     }
   }, [selectedBuildingId, itemType, buildings, itemData]);
@@ -200,8 +193,8 @@ export default function ItemFormDialog({
         amenities: amenities.split(',').map(a => a.trim()).filter(a => a),
         buildingId: selectedBuildingId!,
         buildingName: selectedBuilding?.name,
-        floorNumber: roomFloorNumber!, // Assuming validated
-        category: (itemData as Room)?.category || '',
+        floorNumber: roomFloorNumber!,
+        category: (itemData as Room)?.category || '', // Keep existing category if editing
         status,
       };
       if (description && description.trim()) payload.description = description.trim();
@@ -218,6 +211,7 @@ export default function ItemFormDialog({
         roomId: selectedRoomId!,
         roomName: selectedRoom?.name,
         status,
+        quantity: quantity || 1, // Add quantity to payload
       };
       if (description && description.trim()) payload.description = description.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
@@ -237,7 +231,6 @@ export default function ItemFormDialog({
       onOpenChange(false);
     } catch (error) {
       console.error(`Error during ${itemType} save operation in dialog:`, error);
-      // Toast is handled by parent
     } finally {
       setIsSaving(false);
     }
@@ -312,7 +305,7 @@ export default function ItemFormDialog({
             <>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="capacity" className="text-right">Capacity</Label>
-                <Input id="capacity" type="number" value={capacity} onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 0)} className="col-span-3" />
+                <Input id="capacity" type="number" value={capacity} onChange={(e) => setCapacity(parseInt(e.target.value, 10) || 0)} className="col-span-3" min="0" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amenities" className="text-right">Amenities</Label>
@@ -366,6 +359,18 @@ export default function ItemFormDialog({
                     {deviceTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="quantity" className="text-right">Quantity</Label>
+                <Input 
+                  id="quantity" 
+                  type="number" 
+                  value={quantity} 
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))} 
+                  className="col-span-3" 
+                  min="1"
+                  required 
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="building-select-device" className="text-right">Building</Label>

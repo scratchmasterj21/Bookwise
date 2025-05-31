@@ -54,6 +54,7 @@ export default function ManageDevicesPage() {
         ...deviceData, 
         buildingName: building?.name || deviceData.buildingName,
         roomName: room?.name || deviceData.roomName,
+        quantity: deviceData.quantity || 1, // Ensure quantity is at least 1
       };
 
       if (editingDevice && editingDevice.id) {
@@ -61,8 +62,8 @@ export default function ManageDevicesPage() {
         await updateDevice(editingDevice.id, updateData as Omit<Device, 'id'>);
         toast({ title: "Device Updated", description: `${fullDeviceData.name || editingDevice.name} has been updated.` });
       } else {
-        if (!fullDeviceData.name || !fullDeviceData.type || !fullDeviceData.buildingId || !fullDeviceData.roomId) {
-            toast({ title: "Missing Information", description: "Device name, type, building, and room are required.", variant: "destructive"});
+        if (!fullDeviceData.name || !fullDeviceData.type || !fullDeviceData.buildingId || !fullDeviceData.roomId || !fullDeviceData.quantity) {
+            toast({ title: "Missing Information", description: "Device name, type, quantity, building, and room are required.", variant: "destructive"});
             setIsProcessing(false);
             return;
         }

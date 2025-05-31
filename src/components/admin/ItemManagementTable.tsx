@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers, MapPin } from 'lucide-react'; // Added MapPin
+import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers, MapPin, Boxes } from 'lucide-react'; // Added Boxes for quantity
 import Image from 'next/image';
 import { Badge } from '../ui/badge';
 
@@ -69,7 +69,7 @@ export default function ItemManagementTable({
     }
     // Device (default)
     return (
-      <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Location (Building/Room)</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
+      <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead className="flex items-center gap-1"><Boxes className="h-4 w-4 text-muted-foreground" /> Qty</TableHead><TableHead>Location (Building/Room)</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
     );
   };
 
@@ -147,6 +147,7 @@ export default function ItemManagementTable({
         {commonImageCell}
         <TableCell className="font-medium">{d.name}</TableCell>
         <TableCell>{d.type}</TableCell>
+        <TableCell>{d.quantity}</TableCell> {/* Display quantity */}
         <TableCell>{`${d.buildingName || 'N/A'} / ${d.roomName || 'N/A'}`}</TableCell>
         <TableCell>
           <Badge variant={d.status === 'available' ? 'default' : d.status === 'booked' ? 'secondary' : 'destructive'} className="capitalize">

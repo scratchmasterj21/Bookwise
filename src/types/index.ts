@@ -30,6 +30,7 @@ export interface Device {
   buildingName?: string;
   roomId?: string;
   roomName?: string;
+  quantity: number; // Added quantity
 }
 
 export interface Room {
@@ -43,7 +44,7 @@ export interface Room {
   category?: string;
   buildingId?: string;
   buildingName?: string;
-  floorNumber: 1 | 2; // Added floorNumber
+  floorNumber: 1 | 2;
 }
 
 export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled' | 'active';
