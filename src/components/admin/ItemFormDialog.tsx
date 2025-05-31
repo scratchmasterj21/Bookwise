@@ -55,7 +55,7 @@ export default function ItemFormDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [status, setStatus] = useState<'available' | 'booked' | 'maintenance'>('available');
+  const [status, setStatus] = useState<string>('available'); // Changed to string for flexibility
 
   // Building specific
   const [location, setLocation] = useState('');
@@ -90,7 +90,7 @@ export default function ItemFormDialog({
       if (itemData) {
         setName(itemData.name || '');
         if ('description' in itemData && typeof itemData.description === 'string') setDescription(itemData.description); else setDescription('');
-        if ('status' in itemData && itemData.status) setStatus(itemData.status); else setStatus('available');
+        if ('status' in itemData && itemData.status) setStatus(itemData.status as string); else setStatus('available');
         if ('imageUrl' in itemData && typeof itemData.imageUrl === 'string') setImageUrl(itemData.imageUrl); else setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
 
         if (itemType === 'building') {
@@ -159,13 +159,12 @@ export default function ItemFormDialog({
         if (building.numberOfFloors === 1) {
           setRoomFloorNumber(1);
         } else {
-          // If editing and building hasn't changed, keep existing floor. Otherwise, reset.
           if (!itemData || (itemData as Room).buildingId !== selectedBuildingId) {
             setRoomFloorNumber(undefined);
           }
         }
       } else {
-        setRoomFloorNumber(undefined); // No building selected, so no floor
+        setRoomFloorNumber(undefined); 
       }
     }
   }, [selectedBuildingId, itemType, buildings, itemData, open]);
@@ -175,7 +174,7 @@ export default function ItemFormDialog({
     e.preventDefault();
     setIsSaving(true);
 
-    let dataFields: Omit<Building, 'id'> | Omit<Room, 'id'> | Omit<Device, 'id'>;
+    let dataFields: Partial<Omit<Building, 'id'>> | Partial<Omit<Room, 'id'>> | Partial<Omit<Device, 'id'>>;
 
     if (itemType === 'building') {
       const payload: Partial<Omit<Building, 'id'>> = {
@@ -185,7 +184,7 @@ export default function ItemFormDialog({
       if (location && location.trim()) payload.location = location.trim();
       if (notes && notes.trim()) payload.notes = notes.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
-      dataFields = payload as Omit<Building, 'id'>;
+      dataFields = payload;
     } else if (itemType === 'room') {
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const payload: Partial<Omit<Room, 'id'>> = {
@@ -195,11 +194,11 @@ export default function ItemFormDialog({
         buildingId: selectedBuildingId!,
         buildingName: selectedBuilding?.name,
         floorNumber: roomFloorNumber!,
-        status,
+        status: status as Room['status'],
       };
       if (description && description.trim()) payload.description = description.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
-      dataFields = payload as Omit<Room, 'id'>;
+      dataFields = payload;
     } else { // device
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const selectedRoom = allRooms.find(r => r.id === selectedRoomId);
@@ -210,12 +209,12 @@ export default function ItemFormDialog({
         buildingName: selectedBuilding?.name,
         roomId: selectedRoomId!,
         roomName: selectedRoom?.name,
-        status,
+        status: status as Device['status'],
         quantity: quantity || 1,
       };
       if (description && description.trim()) payload.description = description.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
-      dataFields = payload as Omit<Device, 'id'>;
+      dataFields = payload;
     }
 
     let finalPayload: Item | ItemCreationData;
@@ -402,14 +401,26 @@ export default function ItemFormDialog({
           {itemType !== 'building' && (
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="status" className="text-right">Status</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as 'available' | 'booked' | 'maintenance')}>
+              <Select value={status} onValueChange={(value) => setStatus(value)}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="available">Available</SelectItem>
-                  <SelectItem value="booked">Booked</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  {itemType === 'room' && (
+                    <>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="booked">Booked</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="storage">Storage</SelectItem>
+                    </>
+                  )}
+                  {itemType === 'device' && (
+                    <>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="booked">Booked</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -427,3 +438,4 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
+

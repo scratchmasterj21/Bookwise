@@ -38,7 +38,8 @@ export default function BookItemPage() {
         fetchRoomsFromDB(),
         fetchReservationsFromDB() 
       ]);
-      setRooms(fetchedRooms); // Load all rooms
+      const bookableRooms = fetchedRooms.filter(room => room.status === 'available');
+      setRooms(bookableRooms); 
       setReservations(fetchedReservations);
     } catch (error) {
       console.error("Error fetching data for booking page:", error);
@@ -117,7 +118,7 @@ export default function BookItemPage() {
       
       {(!isLoading && rooms.length === 0) ? (
          <p className="text-muted-foreground text-center mt-6">
-            No rooms found. Please contact an administrator to add rooms to the system.
+            No rooms currently available for booking. Please contact an administrator if you believe this is an error.
         </p>
       ) : (
         <WeeklyBookingCalendar 
@@ -131,3 +132,4 @@ export default function BookItemPage() {
     </div>
   );
 }
+

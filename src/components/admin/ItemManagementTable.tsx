@@ -44,6 +44,16 @@ const ItemIcon = ({ itemType, specificType }: { itemType: ItemType, specificType
   return <Package className="h-5 w-5 text-primary" />;
 };
 
+const getRoomStatusBadgeVariant = (status: Room['status']): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'available': return 'default';
+    case 'booked': return 'secondary';
+    case 'maintenance': return 'destructive';
+    case 'storage': return 'outline';
+    default: return 'default';
+  }
+};
+
 
 export default function ItemManagementTable({
   items,
@@ -124,7 +134,7 @@ export default function ItemManagementTable({
           <TableCell>{r.floorNumber || 'N/A'}</TableCell>
           <TableCell>{r.capacity}</TableCell>
           <TableCell>
-            <Badge variant={r.status === 'available' ? 'default' : r.status === 'booked' ? 'secondary' : 'destructive'} className="capitalize">
+            <Badge variant={getRoomStatusBadgeVariant(r.status)} className="capitalize">
               {r.status}
             </Badge>
           </TableCell>
@@ -169,3 +179,4 @@ export default function ItemManagementTable({
     </div>
   );
 }
+

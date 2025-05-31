@@ -37,7 +37,7 @@ export interface Room {
   id: string;
   name: string;
   capacity: number;
-  status: 'available' | 'booked' | 'maintenance';
+  status: 'available' | 'booked' | 'maintenance' | 'storage'; // Added 'storage'
   imageUrl?: string;
   description?: string;
   amenities?: string[];
@@ -74,3 +74,4 @@ export interface TimePeriod {
   start: string; // e.g., "09:00"
   end: string;   // e.g., "09:45"
 }
+
