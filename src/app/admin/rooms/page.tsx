@@ -45,28 +45,29 @@ export default function ManageRoomsPage() {
     setIsProcessing(true);
     try {
       const building = buildings.find(b => b.id === roomData.buildingId);
-      const fullRoomData = { 
-        ...roomData, 
-        buildingName: building?.name || roomData.buildingName 
+      const fullRoomData = {
+        ...roomData,
+        buildingName: building?.name || roomData.buildingName
       };
+
+      if (!fullRoomData.name || !fullRoomData.buildingId || !fullRoomData.floorNumber) {
+           toast({ title: "Missing Information", description: "Room name, building, and floor number are required.", variant: "destructive"});
+           setIsProcessing(false);
+           return;
+      }
 
       if (editingRoom && editingRoom.id) {
         const { id, ...updateData } = fullRoomData;
         await updateRoom(editingRoom.id, updateData as Omit<Room, 'id'>);
         toast({ title: "Room Updated", description: `${fullRoomData.name || editingRoom.name} has been updated.` });
       } else {
-        if (!fullRoomData.name || !fullRoomData.buildingId) {
-             toast({ title: "Missing Information", description: "Room name and building are required.", variant: "destructive"});
-             setIsProcessing(false);
-             return;
-        }
         const newRoomData = fullRoomData as Omit<Room, 'id'>;
         await addRoom(newRoomData);
         toast({ title: "Room Added", description: `${newRoomData.name} has been added.` });
       }
       setEditingRoom(null);
       setIsFormOpen(false);
-      fetchPageData(); 
+      fetchPageData();
     } catch (error) {
       console.error("Error saving room:", error);
       toast({ title: "Error", description: "Could not save room.", variant: "destructive" });
@@ -80,7 +81,7 @@ export default function ManageRoomsPage() {
     try {
       await deleteRoomFromDB(roomId);
       toast({ title: "Room Deleted", description: `Room ID ${roomId} has been deleted.`, variant: "destructive" });
-      fetchPageData(); 
+      fetchPageData();
     } catch (error) {
       console.error("Error deleting room:", error);
       toast({ title: "Error", description: "Could not delete room.", variant: "destructive" });
@@ -88,7 +89,7 @@ export default function ManageRoomsPage() {
       setIsProcessing(false);
     }
   };
-  
+
   const openAddForm = () => {
     setEditingRoom(null);
     setIsFormOpen(true);
@@ -121,7 +122,7 @@ export default function ManageRoomsPage() {
             onSave={handleSaveRoom}
             open={isFormOpen}
             onOpenChange={setIsFormOpen}
-            buildings={buildings} 
+            buildings={buildings}
             triggerButton={
               <Button onClick={openAddForm} className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isProcessing || buildings.length === 0}>
                 {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}

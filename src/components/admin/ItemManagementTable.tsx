@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers } from 'lucide-react';
+import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers, MapPin } from 'lucide-react'; // Added MapPin
 import Image from 'next/image';
 import { Badge } from '../ui/badge';
 
@@ -55,7 +55,7 @@ export default function ItemManagementTable({
   if (items.length === 0) {
     return <p className="text-muted-foreground mt-4 text-center">No {itemType}s found. Add some!</p>;
   }
-  
+
   const renderTableHeader = () => {
     if (itemType === 'building') {
       return (
@@ -64,7 +64,7 @@ export default function ItemManagementTable({
     }
     if (itemType === 'room') {
       return (
-        <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Building</TableHead><TableHead>Capacity</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
+        <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Building</TableHead><TableHead className="flex items-center gap-1"><MapPin className="h-4 w-4 text-muted-foreground" /> Floor</TableHead><TableHead>Capacity</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
       );
     }
     // Device (default)
@@ -77,12 +77,12 @@ export default function ItemManagementTable({
     const commonImageCell = (
       <TableCell>
         {item.imageUrl ? (
-          <Image 
-            src={item.imageUrl} 
-            alt={item.name} 
-            width={40} 
-            height={40} 
-            className="rounded object-cover aspect-square" 
+          <Image
+            src={item.imageUrl}
+            alt={item.name}
+            width={40}
+            height={40}
+            className="rounded object-cover aspect-square"
             data-ai-hint={itemType === 'device' ? "technology device" : itemType === 'room' ? "meeting room" : "building exterior"}
           />
         ) : (
@@ -121,6 +121,7 @@ export default function ItemManagementTable({
           {commonImageCell}
           <TableCell className="font-medium">{r.name}</TableCell>
           <TableCell>{r.buildingName || 'N/A'}</TableCell>
+          <TableCell>{r.floorNumber || 'N/A'}</TableCell>
           <TableCell>{r.capacity}</TableCell>
           <TableCell>
             <Badge variant={r.status === 'available' ? 'default' : r.status === 'booked' ? 'secondary' : 'destructive'} className="capitalize">
@@ -138,7 +139,7 @@ export default function ItemManagementTable({
         </TableRow>
       );
     }
-    
+
     // Device
     const d = item as Device;
     return (

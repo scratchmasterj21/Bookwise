@@ -5,7 +5,7 @@ export interface User {
   displayName: string | null;
   photoURL: string | null;
   isAdmin?: boolean;
-  createdAt?: Date | any; 
+  createdAt?: Date | any;
 }
 
 export type DeviceType = 'Laptop' | 'Tablet' | 'Monitor' | 'Projector' | 'Other';
@@ -14,9 +14,9 @@ export interface Building {
   id: string;
   name: string;
   location?: string;
-  numberOfFloors: 1 | 2; // Changed from floor?: string
+  numberOfFloors: 1 | 2;
   notes?: string;
-  imageUrl?: string; 
+  imageUrl?: string;
 }
 
 export interface Device {
@@ -40,9 +40,10 @@ export interface Room {
   imageUrl?: string;
   description?: string;
   amenities?: string[];
-  category?: string; 
+  category?: string;
   buildingId?: string;
   buildingName?: string;
+  floorNumber: 1 | 2; // Added floorNumber
 }
 
 export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled' | 'active';
@@ -50,26 +51,26 @@ export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'completed
 export interface Reservation {
   id: string;
   userId: string;
-  userName?: string; 
+  userName?: string;
   userEmail?: string;
-  itemId: string; 
-  itemName?: string; 
+  itemId: string;
+  itemName?: string;
   itemType: 'device' | 'room';
-  startTime: Date; 
-  endTime: Date;   
+  startTime: Date;
+  endTime: Date;
   status: ReservationStatus;
   notes?: string;
-  purpose?: string; 
-  bookedBy?: string; 
+  purpose?: string;
+  bookedBy?: string;
 }
 
 export type ReservationRequest = Omit<Reservation, 'id' | 'userId' | 'userName' | 'userEmail' | 'status'> & {
-  userId?: string; 
+  userId?: string;
 };
 
 export interface TimePeriod {
   name: string;
-  label: string; 
-  start: string; 
-  end: string;   
+  label: string;
+  start: string;
+  end: string;
 }
