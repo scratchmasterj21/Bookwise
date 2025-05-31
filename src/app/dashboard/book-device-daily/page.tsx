@@ -3,11 +3,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import DailyBookingTable from '@/components/reservations/DailyBookingTable';
-import type { Device, Reservation } from '@/types';
+import type { Device, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservation, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
 import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -28,6 +28,7 @@ export default function BookDeviceDailyPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
+  const [tableKey, setTableKey] = useState(Date.now()); // Key to reset DailyBookingTable
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -62,7 +63,7 @@ export default function BookDeviceDailyPage() {
     endTime: Date;
     devicePurposes?: string[];
     notes?: string;
-    bookedQuantity?: number; // Added
+    bookedQuantity?: number; 
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
@@ -81,7 +82,7 @@ export default function BookDeviceDailyPage() {
       status: 'approved',
       devicePurposes: bookingDetails.devicePurposes,
       notes: bookingDetails.notes,
-      bookedQuantity: bookingDetails.bookedQuantity || 1, // Use provided or default to 1
+      bookedQuantity: bookingDetails.bookedQuantity || 1, 
       bookedBy: user.displayName || user.email || "User",
     };
 
@@ -147,6 +148,68 @@ export default function BookDeviceDailyPage() {
     }
   };
 
+  const handleConfirmMultiBookDeviceDaily = async (details: {
+    deviceId: string;
+    deviceName: string;
+    periods: TimePeriod[];
+    quantity: number;
+    devicePurposes: string[];
+    notes: string;
+  }) => {
+    if (!user) {
+      toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
+      throw new Error("User not logged in");
+    }
+    setIsProcessingGlobal(true);
+    let successCount = 0;
+    let failCount = 0;
+    const newBookings: Reservation[] = [];
+
+    for (const period of details.periods) {
+      const startTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.start.split(':')[0])), parseInt(period.start.split(':')[1])),0),0);
+      const endTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.end.split(':')[0])), parseInt(period.end.split(':')[1])),0),0);
+      
+      const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: user.uid,
+        userName: user.displayName || user.email || "User",
+        userEmail: user.email || undefined,
+        itemId: details.deviceId,
+        itemName: details.deviceName,
+        itemType: 'device',
+        startTime,
+        endTime,
+        status: 'approved',
+        devicePurposes: details.devicePurposes,
+        notes: details.notes,
+        bookedQuantity: details.quantity,
+        bookedBy: user.displayName || user.email || "User",
+      };
+      try {
+        const addedReservation = await addReservation(newReservationData);
+        newBookings.push(addedReservation);
+        successCount++;
+      } catch (error) {
+        console.error(`Error booking slot ${format(startTime, "MMM d, HH:mm")} for ${details.deviceName}:`, error);
+        failCount++;
+      }
+    }
+    
+    setReservations(prev => [...prev, ...newBookings]);
+
+    if (successCount > 0) {
+      toast({
+        title: "Multi-Booking Processed",
+        description: `${successCount} period(s) for ${details.deviceName} booked successfully. ${failCount > 0 ? `${failCount} failed.` : ''}`,
+      });
+    } else if (failCount > 0) {
+       toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed for ${details.deviceName}. Please try again.`, variant: "destructive" });
+    }
+    
+    setTableKey(Date.now()); // Force re-render of table to reset its internal multi-select state
+    setIsProcessingGlobal(false);
+  };
+
+
   if (authLoading || (isLoading && devices.length === 0)) {
      return (
         <div className="space-y-4">
@@ -200,6 +263,7 @@ export default function BookDeviceDailyPage() {
          <Skeleton className="h-[500px] w-full" />
       ) : (
         <DailyBookingTable
+          key={tableKey}
           selectedDate={selectedDate}
           items={devices}
           itemType="device"
@@ -207,6 +271,7 @@ export default function BookDeviceDailyPage() {
           onBookSlot={handleBookSlot as any}
           onUpdateSlot={handleUpdateSlot as any}
           onDeleteSlot={handleDeleteSlotRequest}
+          onConfirmMultiBookDaily={handleConfirmMultiBookDeviceDaily}
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
           itemDisplayName="Device"
@@ -233,3 +298,5 @@ export default function BookDeviceDailyPage() {
     </div>
   );
 }
+
+    
