@@ -74,16 +74,17 @@ interface ItemStyling {
   borderClass: string;
   textClass: string;
   icon?: React.ElementType;
+  backgroundClass?: string; // Added for device specific booked background
 }
 
 
 const getRoomStyling = (roomName?: string): ItemStyling => {
   const lowerRoomName = roomName?.toLowerCase() || "";
-  if (lowerRoomName.includes('computer room')) return { borderClass: 'border-sky-400', textClass: 'text-sky-700' };
-  if (lowerRoomName.includes('multipurpose room')) return { borderClass: 'border-purple-400', textClass: 'text-purple-700' };
-  if (lowerRoomName.includes('music')) return { borderClass: 'border-orange-400', textClass: 'text-orange-700' };
-  if (lowerRoomName.includes('agape hall')) return { borderClass: 'border-emerald-400', textClass: 'text-emerald-700' };
-  return { borderClass: 'border-amber-400', textClass: 'text-amber-700' };
+  if (lowerRoomName.includes('computer room')) return { borderClass: 'border-sky-400', textClass: 'text-sky-700', backgroundClass: 'bg-sky-50' };
+  if (lowerRoomName.includes('multipurpose room')) return { borderClass: 'border-purple-400', textClass: 'text-purple-700', backgroundClass: 'bg-purple-50' };
+  if (lowerRoomName.includes('music')) return { borderClass: 'border-orange-400', textClass: 'text-orange-700', backgroundClass: 'bg-orange-50' };
+  if (lowerRoomName.includes('agape hall')) return { borderClass: 'border-emerald-400', textClass: 'text-emerald-700', backgroundClass: 'bg-emerald-50' };
+  return { borderClass: 'border-amber-400', textClass: 'text-amber-700', backgroundClass: 'bg-amber-50' };
 };
 
 const getDeviceStyling = (deviceType?: DeviceType): ItemStyling => {
@@ -98,11 +99,11 @@ const getDeviceStyling = (deviceType?: DeviceType): ItemStyling => {
     default: IconComponent = Package;
   }
   switch (deviceType) {
-    case 'Laptop': return { borderClass: 'border-blue-400', textClass: 'text-blue-700', icon: IconComponent };
-    case 'Tablet': return { borderClass: 'border-indigo-400', textClass: 'text-indigo-700', icon: IconComponent };
-    case 'Monitor': return { borderClass: 'border-gray-400', textClass: 'text-gray-700', icon: IconComponent };
-    case 'Projector': return { borderClass: 'border-teal-400', textClass: 'text-teal-700', icon: IconComponent };
-    default: return { borderClass: 'border-slate-400', textClass: 'text-slate-700', icon: IconComponent };
+    case 'Laptop': return { borderClass: 'border-blue-400', textClass: 'text-blue-700', backgroundClass: 'bg-blue-50', icon: IconComponent };
+    case 'Tablet': return { borderClass: 'border-indigo-400', textClass: 'text-indigo-700', backgroundClass: 'bg-indigo-50', icon: IconComponent };
+    case 'Monitor': return { borderClass: 'border-gray-400', textClass: 'text-gray-700', backgroundClass: 'bg-gray-50', icon: IconComponent };
+    case 'Projector': return { borderClass: 'border-teal-400', textClass: 'text-teal-700', backgroundClass: 'bg-teal-50', icon: IconComponent };
+    default: return { borderClass: 'border-slate-400', textClass: 'text-slate-700', backgroundClass: 'bg-slate-50', icon: IconComponent };
   }
 };
 
@@ -413,9 +414,9 @@ export default function WeeklyBookingCalendar({
             baseClasses = cn(baseClasses, "bg-background hover:bg-primary/10 border-slate-200 cursor-pointer transition-colors duration-150");
         } else if (cellData.status === 'all-booked' && selectedItemId !== ALL_ITEMS_ID) {
              baseClasses = cn(baseClasses, "bg-red-50 text-red-700 border-red-300 cursor-not-allowed", itemStyling.borderClass);
-        } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID) { // All items view, all booked
+        } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID) { 
              baseClasses = cn(baseClasses, "bg-red-50 text-red-700 border-red-200 cursor-pointer");
-        } else if (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) { // All items view
+        } else if (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) { 
             baseClasses = cn(baseClasses, "bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700 cursor-pointer transition-colors duration-150");
         } else { 
             baseClasses = cn(baseClasses, "bg-card hover:bg-muted border-slate-200");
@@ -454,9 +455,9 @@ export default function WeeklyBookingCalendar({
                 description: `${cellData.itemName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || cellData.devicePurposes?.join(', ') || cellData.notes || 'N/A'}`
             });
         }
-    } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device')) { // Allow booking if 'all-booked' but 'all items' selected (for devices)
+    } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device')) { 
         handleSlotAction(day, period, 'book');
-    } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'room') { // Specifically for rooms in all-view
+    } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'room') { 
         toast({ title: `No ${itemDisplayName}s Available`, description: `All ${itemDisplayName.toLowerCase()}s are booked for this slot.`, variant: "default" });
     } else if (cellData.status === 'all-booked' && itemType === 'device' && selectedItemId !== ALL_ITEMS_ID && !canManageCurrentBooking) {
         toast({ title: "Fully Booked", description: `${cellData.itemName} is fully booked for this slot.` });
@@ -467,14 +468,14 @@ export default function WeeklyBookingCalendar({
     if (isSlotProcessing || isProcessingGlobal) return true;
     if (selectedItemId === ALL_ITEMS_ID && !editingReservationId && !modalSelectedItemIdForBooking) return true;
     if (itemType === 'room' && !bookingPurpose.trim()) return true;
-    if (itemType === 'device' && selectedDevicePurposes.length === 0) return true; // Require at least one purpose for devices
+    if (itemType === 'device' && selectedDevicePurposes.length === 0) return true; 
 
     if (itemType === 'device' && currentBookingSlot && !editingReservationId) {
       const itemIdToCheck = modalSelectedItemIdForBooking || selectedItemId;
       const itemForBooking = items.find(i => i.id === itemIdToCheck) as Device | undefined;
       if (itemForBooking) {
-        const reservationsForSlot = getReservationsForSlot(currentBookingSlot.day, currentBookingSlot.period, itemForBooking.id);
-        if (itemForBooking.quantity - reservationsForSlot.length <= 0) return true;
+        const reservationsInSlot = getReservationsForSlot(currentBookingSlot.day, currentBookingSlot.period, itemForBooking.id);
+        if (itemForBooking.quantity - reservationsInSlot.length <= 0) return true;
       }
     }
     return false;
@@ -486,7 +487,7 @@ export default function WeeklyBookingCalendar({
       <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 pb-4 pt-4 px-4 border-b bg-primary/5">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <Select value={selectedItemId} onValueChange={setSelectedItemId} disabled={isProcessingGlobal || isSlotProcessing}>
-            <SelectTrigger className="w-full md:w-[280px] bg-background shadow-sm">
+            <SelectTrigger className="w-full md:w-[320px] bg-background shadow-sm">
               <SelectValue placeholder={`Select a ${itemDisplayName.toLowerCase()} or View All`} />
             </SelectTrigger>
             <SelectContent>
@@ -496,9 +497,9 @@ export default function WeeklyBookingCalendar({
                   <div className="flex items-center gap-2">
                     {itemType === 'device' && getIconForItemType(itemType, (item as Device).type) && 
                         React.createElement(getIconForItemType(itemType, (item as Device).type)!, {className: "h-4 w-4 text-muted-foreground"})}
-                    {item.name} 
-                    {itemType === 'room' && ` (${(item as Room).buildingName || 'N/A'})`}
-                    {itemType === 'device' && ` (Qty: ${(item as Device).quantity})`}
+                    {itemType === 'device' ? `${(item as Device).roomName || 'N/A'} - ${item.name} (Qty: ${(item as Device).quantity})`
+                      : `${item.name} (${(item as Room).buildingName || 'N/A'})`
+                    }
                   </div>
                 </SelectItem>
               ))}
@@ -548,8 +549,7 @@ export default function WeeklyBookingCalendar({
                       const currentItem = items.find(i => i.id === selectedItemId);
                       const itemStyling = currentItem ? getItemStyling(currentItem, itemType) : (itemType === 'room' ? getRoomStyling() : getDeviceStyling());
                       
-                      const canManageBooking = isAdmin || cellData.isCurrentUserBooking;
-                      const showActions = canManageBooking && cellData.mainReservation && !cellData.isPast && selectedItemId !== ALL_ITEMS_ID && hoveredSlot === slotKey;
+                      const showActions = (isAdmin || cellData.isCurrentUserBooking) && cellData.mainReservation && !cellData.isPast && selectedItemId !== ALL_ITEMS_ID && hoveredSlot === slotKey;
 
                       return (
                         <td
@@ -675,8 +675,9 @@ export default function WeeklyBookingCalendar({
                             <div className="flex items-center gap-2">
                                 {itemType === 'device' && getIconForItemType(itemType, (item as Device).type) && 
                                 React.createElement(getIconForItemType(itemType, (item as Device).type)!, {className: "h-4 w-4 text-muted-foreground"})}
-                                {item.name}
-                                {itemType === 'device' && ` (Available: ${(item as Device).quantity - getReservationsForSlot(currentBookingSlot.day, currentBookingSlot.period, item.id).length})`}
+                                {itemType === 'device' ? `${(item as Device).roomName || 'N/A'} - ${item.name} (Available: ${(item as Device).quantity - getReservationsForSlot(currentBookingSlot.day, currentBookingSlot.period, item.id).length})`
+                                  : `${item.name}`
+                                }
                             </div>
                           </SelectItem>
                       ))}
@@ -738,7 +739,7 @@ export default function WeeklyBookingCalendar({
                     </ScrollArea>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="booking-notes" className="font-medium">Additional Notes (optional):</Label>
+                    <Label htmlFor="booking-notes" className="font-medium">{bookingModalPurposeLabel}:</Label>
                     <Input
                       id="booking-notes"
                       value={bookingNotes}
@@ -771,3 +772,5 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
+
+    

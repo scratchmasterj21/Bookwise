@@ -47,7 +47,7 @@ interface DailyBookingTableProps {
   periods: TimePeriod[];
   isProcessingGlobal?: boolean;
   itemDisplayName?: string;
-  bookingModalPurposeLabel?: string; // Will be "Purpose" for rooms, "Additional Notes (optional)" for devices
+  bookingModalPurposeLabel?: string; 
 }
 
 interface CellDisplayInfo {
@@ -55,9 +55,9 @@ interface CellDisplayInfo {
   isPast: boolean;
   displayText?: string;
   bookedBy?: string;
-  purpose?: string; // Room purpose
-  devicePurposes?: string[]; // Device purposes
-  notes?: string; // Device notes
+  purpose?: string; 
+  devicePurposes?: string[]; 
+  notes?: string; 
   itemName?: string;
   isCurrentUserBooking?: boolean;
   mainReservation?: Reservation; 
@@ -152,9 +152,9 @@ export default function DailyBookingTable({
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [currentBookingSlot, setCurrentBookingSlot] = useState<{item: Item, period: TimePeriod, existingReservation?: Reservation} | null>(null);
   
-  const [bookingPurpose, setBookingPurpose] = useState(''); // For rooms
-  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); // For devices
-  const [bookingNotes, setBookingNotes] = useState(''); // For devices
+  const [bookingPurpose, setBookingPurpose] = useState(''); 
+  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); 
+  const [bookingNotes, setBookingNotes] = useState(''); 
 
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null); 
@@ -388,7 +388,7 @@ export default function DailyBookingTable({
           <table className="w-full border-collapse text-sm min-w-[900px]">
             <thead>
               <tr className="bg-muted">
-                <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[150px]">{itemDisplayName}</th>
+                <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[200px]">{itemDisplayName}</th>
                 {periods.map(period => (
                   <th key={period.name} className={cn(
                       "p-2 border-b border-r text-center min-w-[120px] font-semibold text-foreground align-middle h-16",
@@ -401,14 +401,14 @@ export default function DailyBookingTable({
             <tbody>
               {items.map(item => (
                 <tr key={item.id} className="even:bg-background odd:bg-muted/20">
-                  <td className="p-2 border-r text-left sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[150px] whitespace-nowrap">
+                  <td className="p-2 border-r text-left sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[200px] whitespace-nowrap">
                      <div className="flex items-center gap-2">
                         {getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name) &&
                            React.createElement(getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name)!, { className: "h-5 w-5 text-primary"})}
-                        <span>{item.name}</span>
+                        {itemType === 'device' ? `${(item as Device).roomName || 'N/A'} - ${item.name}` : item.name}
                      </div>
-                     {itemType === 'room' && <div className="text-xs text-muted-foreground">{(item as Room).buildingName}</div>}
-                     {itemType === 'device' && <div className="text-xs text-muted-foreground">Type: {(item as Device).type} (Qty: {(item as Device).quantity})</div>}
+                     {itemType === 'room' && <div className="text-xs text-muted-foreground ml-7">{(item as Room).buildingName}</div>}
+                     {itemType === 'device' && <div className="text-xs text-muted-foreground ml-7">Type: {(item as Device).type} (Qty: {(item as Device).quantity})</div>}
                   </td>
                   {periods.map(period => {
                     const slotKey = `${item.id}-${period.name}`;
@@ -544,7 +544,7 @@ export default function DailyBookingTable({
                     </ScrollArea>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="booking-notes" className="font-medium">Additional Notes (optional):</Label>
+                    <Label htmlFor="booking-notes" className="font-medium">{bookingModalPurposeLabel}:</Label>
                     <Input
                       id="booking-notes"
                       value={bookingNotes}
@@ -576,3 +576,5 @@ export default function DailyBookingTable({
     </Card>
   );
 }
+
+    
