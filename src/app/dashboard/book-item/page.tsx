@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation } from '@/services/firestoreService';
+import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose } from '@/services/firestoreService';
 import { Loader2 } from 'lucide-react';
 
 
@@ -22,14 +22,14 @@ const TIME_PERIODS: TimePeriod[] = [
   { name: '6th Period', label: '14:15 - 15:00', start: '14:15', end: '15:00' },
 ];
 
-export default function BookItemPage() {
+export default function BookRoomPage() { // Renamed from BookItemPage
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBooking, setIsBooking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Combined booking/updating state
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -68,7 +68,7 @@ export default function BookItemPage() {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
       throw new Error("User not logged in"); 
     }
-    setIsBooking(true);
+    setIsProcessing(true);
     const newReservationData: Omit<Reservation, 'id'> = {
       userId: user.uid,
       userName: user.displayName || user.email || "User",
@@ -95,14 +95,38 @@ export default function BookItemPage() {
        toast({ title: "Booking Failed", description: "Could not create reservation. Please try again.", variant: "destructive"});
        throw error; 
     } finally {
-        setIsBooking(false);
+        setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateSlot = async (reservationId: string, newPurpose: string) => {
+    if (!user) {
+      toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
+      throw new Error("User not logged in");
+    }
+    setIsProcessing(true);
+    try {
+      await updateReservationPurpose(reservationId, newPurpose);
+      setReservations(prev => 
+        prev.map(res => res.id === reservationId ? { ...res, purpose: newPurpose } : res)
+      );
+      toast({
+        title: 'Booking Updated!',
+        description: `Booking purpose has been updated.`,
+      });
+    } catch (error) {
+      console.error("Error updating reservation:", error);
+      toast({ title: "Update Failed", description: "Could not update booking. Please try again.", variant: "destructive"});
+      throw error;
+    } finally {
+      setIsProcessing(false);
     }
   };
   
   if (authLoading || isLoading) {
      return (
         <div className="space-y-4">
-          <Skeleton className="h-10 w-1/4 mb-4" />
+          <Skeleton className="h-10 w-1/3 mb-4" /> {/* Adjusted for new title */}
           <Skeleton className="h-12 w-1/3 mb-2" />
           <Skeleton className="h-[500px] w-full" />
         </div>
@@ -112,8 +136,8 @@ export default function BookItemPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2> {/* Title remains same but context from layout changes */}
-        {isBooking && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+        <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
+        {isProcessing && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
       </div>
       
       {(!isLoading && rooms.length === 0) ? (
@@ -125,8 +149,9 @@ export default function BookItemPage() {
           rooms={rooms}
           reservations={reservations}
           onBookSlot={handleBookSlot}
+          onUpdateSlot={handleUpdateSlot}
           periods={TIME_PERIODS}
-          isBookingGlobal={isBooking}
+          isProcessingGlobal={isProcessing}
         />
       )}
     </div>

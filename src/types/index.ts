@@ -37,7 +37,7 @@ export interface Room {
   id: string;
   name: string;
   capacity: number;
-  status: 'available' | 'booked' | 'maintenance' | 'storage'; // Added 'storage'
+  status: 'available' | 'booked' | 'maintenance' | 'storage';
   imageUrl?: string;
   description?: string;
   amenities?: string[];
@@ -53,15 +53,15 @@ export interface Reservation {
   userId: string;
   userName?: string;
   userEmail?: string;
-  itemId: string;
-  itemName?: string;
+  itemId: string; // This will be roomId for room reservations
+  itemName?: string; // Room name
   itemType: 'device' | 'room';
   startTime: Date;
   endTime: Date;
   status: ReservationStatus;
   notes?: string;
   purpose?: string;
-  bookedBy?: string;
+  bookedBy?: string; // Name/email of the person who made the booking (could be user or admin)
 }
 
 export type ReservationRequest = Omit<Reservation, 'id' | 'userId' | 'userName' | 'userEmail' | 'status'> & {
@@ -74,4 +74,3 @@ export interface TimePeriod {
   start: string; // e.g., "09:00"
   end: string;   // e.g., "09:45"
 }
-

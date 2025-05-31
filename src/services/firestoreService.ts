@@ -13,7 +13,9 @@ import {
   DocumentData,
   QueryDocumentSnapshot,
   FirestoreDataConverter,
-  DocumentSnapshot
+  DocumentSnapshot,
+  orderBy,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Building, Room, Device, Reservation, User } from '@/types';
@@ -37,21 +39,40 @@ export const getUserProfile = async (userId: string): Promise<User | null> => {
 
 // --- Converters ---
 const buildingConverter: FirestoreDataConverter<Building> = {
-  toFirestore(building: Omit<Building, 'id'>): DocumentData { // Adjusted to Omit id for toFirestore
-    return { ...building };
+  toFirestore(building: Omit<Building, 'id'>): DocumentData {
+    const data: DocumentData = { name: building.name, numberOfFloors: building.numberOfFloors };
+    if (building.location) data.location = building.location;
+    if (building.notes) data.notes = building.notes;
+    if (building.imageUrl) data.imageUrl = building.imageUrl;
+    return data;
   },
-  fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Building { // Allow DocumentSnapshot for getDoc
+  fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Building {
     const data = snapshot.data()!;
     return {
       id: snapshot.id,
-      ...data,
+      name: data.name,
+      numberOfFloors: data.numberOfFloors,
+      location: data.location,
+      notes: data.notes,
+      imageUrl: data.imageUrl,
     } as Building;
   }
 };
 
 const roomConverter: FirestoreDataConverter<Room> = {
   toFirestore(room: Omit<Room, 'id'>): DocumentData {
-    return { ...room };
+    const data: DocumentData = {
+      name: room.name,
+      capacity: room.capacity,
+      status: room.status,
+      buildingId: room.buildingId,
+      buildingName: room.buildingName,
+      floorNumber: room.floorNumber,
+    };
+    if (room.imageUrl) data.imageUrl = room.imageUrl;
+    if (room.description) data.description = room.description;
+    if (room.amenities) data.amenities = room.amenities;
+    return data;
   },
   fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Room {
     const data = snapshot.data()!;
@@ -64,7 +85,19 @@ const roomConverter: FirestoreDataConverter<Room> = {
 
 const deviceConverter: FirestoreDataConverter<Device> = {
   toFirestore(device: Omit<Device, 'id'>): DocumentData {
-    return { ...device };
+     const data: DocumentData = {
+      name: device.name,
+      type: device.type,
+      status: device.status,
+      quantity: device.quantity,
+    };
+    if (device.imageUrl) data.imageUrl = device.imageUrl;
+    if (device.description) data.description = device.description;
+    if (device.buildingId) data.buildingId = device.buildingId;
+    if (device.buildingName) data.buildingName = device.buildingName;
+    if (device.roomId) data.roomId = device.roomId;
+    if (device.roomName) data.roomName = device.roomName;
+    return data;
   },
   fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Device {
     const data = snapshot.data()!;
@@ -77,11 +110,21 @@ const deviceConverter: FirestoreDataConverter<Device> = {
 
 const reservationConverter: FirestoreDataConverter<Reservation> = {
   toFirestore(reservation: Omit<Reservation, 'id'>): DocumentData {
-    return {
-      ...reservation,
+    const data: DocumentData = {
+      userId: reservation.userId,
+      itemId: reservation.itemId,
+      itemType: reservation.itemType,
       startTime: Timestamp.fromDate(new Date(reservation.startTime)),
       endTime: Timestamp.fromDate(new Date(reservation.endTime)),
+      status: reservation.status,
     };
+    if (reservation.userName) data.userName = reservation.userName;
+    if (reservation.userEmail) data.userEmail = reservation.userEmail;
+    if (reservation.itemName) data.itemName = reservation.itemName;
+    if (reservation.notes) data.notes = reservation.notes;
+    if (reservation.purpose) data.purpose = reservation.purpose;
+    if (reservation.bookedBy) data.bookedBy = reservation.bookedBy;
+    return data;
   },
   fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Reservation {
     const data = snapshot.data()!;
@@ -99,7 +142,6 @@ const reservationConverter: FirestoreDataConverter<Reservation> = {
 export const addBuilding = async (buildingData: Omit<Building, 'id'>): Promise<Building> => {
   const buildingsCol = collection(db, 'buildings').withConverter(buildingConverter);
   const docRef = await addDoc(buildingsCol, buildingData);
-  // Fetch the document to get the fully converted object with ID
   const newDocSnap = await getDoc(docRef.withConverter(buildingConverter));
   if (!newDocSnap.exists()) throw new Error("Failed to create building");
   return newDocSnap.data()!;
@@ -119,7 +161,6 @@ export const updateBuilding = async (buildingId: string, buildingData: Partial<O
 export const deleteBuilding = async (buildingId: string): Promise<void> => {
   const buildingRef = doc(db, 'buildings', buildingId);
   await deleteDoc(buildingRef);
-  // TODO: Consider cascading deletes or warnings for rooms/devices in this building
 };
 
 // --- Room Operations ---
@@ -148,7 +189,6 @@ export const updateRoom = async (roomId: string, roomData: Partial<Omit<Room, 'i
 export const deleteRoom = async (roomId: string): Promise<void> => {
   const roomRef = doc(db, 'rooms', roomId);
   await deleteDoc(roomRef);
-  // TODO: Consider cascading deletes or warnings for devices in this room
 };
 
 // --- Device Operations ---
@@ -194,14 +234,20 @@ export const addReservation = async (reservationData: Omit<Reservation, 'id'>): 
 
 export const getReservations = async (userId?: string, itemId?: string): Promise<Reservation[]> => {
   let q = query(collection(db, 'reservations'));
+  const conditions = [];
   if (userId) {
-    q = query(q, where('userId', '==', userId));
+    conditions.push(where('userId', '==', userId));
   }
   if (itemId) {
-    q = query(q, where('itemId', '==', itemId));
+    conditions.push(where('itemId', '==', itemId));
   }
-  // Add ordering if needed, e.g., by startTime
-  // q = query(q, orderBy('startTime', 'desc'));
+  
+  if (conditions.length > 0) {
+      q = query(collection(db, 'reservations'), ...conditions);
+  } else {
+      q = query(collection(db, 'reservations'));
+  }
+  // q = query(q, orderBy('startTime', 'desc')); // Removed default sort to allow page-specific sorting
   const snapshot = await getDocs(q.withConverter(reservationConverter));
   return snapshot.docs.map(doc => doc.data());
 };
@@ -209,6 +255,11 @@ export const getReservations = async (userId?: string, itemId?: string): Promise
 export const updateReservationStatus = async (reservationId: string, status: Reservation['status']): Promise<void> => {
   const reservationRef = doc(db, 'reservations', reservationId);
   await updateDoc(reservationRef, { status });
+};
+
+export const updateReservationPurpose = async (reservationId: string, purpose: string): Promise<void> => {
+  const reservationRef = doc(db, 'reservations', reservationId);
+  await updateDoc(reservationRef, { purpose });
 };
 
 export const cancelReservation = async (reservationId: string): Promise<void> => {
