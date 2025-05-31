@@ -23,7 +23,7 @@ export default function BookDeviceWeeklyPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
-  const [calendarKey, setCalendarKey] = useState(Date.now()); 
+  const [calendarKey, setCalendarKey] = useState(Date.now()); // Used to reset calendar state
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -33,6 +33,7 @@ export default function BookDeviceWeeklyPage() {
         fetchReservationsFromDB()
       ]);
 
+      // Filter devices that are available and have quantity > 0
       const bookableDevices = fetchedDevices.filter(device => device.status === 'available' && device.quantity > 0);
       setDevices(bookableDevices);
       setReservations(fetchedReservations.filter(r => r.itemType === 'device'));
@@ -75,7 +76,7 @@ export default function BookDeviceWeeklyPage() {
       itemType: 'device',
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
-      status: 'approved',
+      status: 'approved', // Assuming direct approval for devices
       devicePurposes: bookingDetails.devicePurposes,
       notes: bookingDetails.notes,
       bookedQuantity: bookingDetails.bookedQuantity || 1,
@@ -92,7 +93,7 @@ export default function BookDeviceWeeklyPage() {
     } catch (error) {
        console.error("Error creating device reservation:", error);
        toast({ title: "Booking Failed", description: "Could not create device reservation. Please try again.", variant: "destructive"});
-       throw error;
+       throw error; // Re-throw to be caught by calendar component's processing state
     } finally {
         setIsProcessingGlobal(false);
     }
@@ -105,9 +106,16 @@ export default function BookDeviceWeeklyPage() {
     }
     setIsProcessingGlobal(true);
     try {
-      await updateReservation(reservationId, newDetails);
+      // Ensure only valid fields are passed for update
+      const updateData: Partial<Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'>> = {};
+      if (newDetails.devicePurposes) updateData.devicePurposes = newDetails.devicePurposes;
+      if (newDetails.notes) updateData.notes = newDetails.notes;
+      if (newDetails.bookedQuantity !== undefined) updateData.bookedQuantity = newDetails.bookedQuantity;
+
+      await updateReservation(reservationId, updateData);
+      // Update local state
       const updatedReservations = reservations.map(res => 
-        res.id === reservationId ? { ...res, ...newDetails, bookedQuantity: newDetails.bookedQuantity || res.bookedQuantity } : res
+        res.id === reservationId ? { ...res, ...updateData, bookedQuantity: newDetails.bookedQuantity || res.bookedQuantity } : res
       );
       setReservations(updatedReservations);
       toast({
@@ -163,6 +171,7 @@ export default function BookDeviceWeeklyPage() {
     const newBookings: Reservation[] = [];
 
     for (const slot of details.slots) {
+      // Ensure time is set correctly from period strings
       const startTime = setMilliseconds(setSeconds(setMinutes(setHours(slot.day, parseInt(slot.period.start.split(':')[0])), parseInt(slot.period.start.split(':')[1])),0),0);
       const endTime = setMilliseconds(setSeconds(setMinutes(setHours(slot.day, parseInt(slot.period.end.split(':')[0])), parseInt(slot.period.end.split(':')[1])),0),0);
       
@@ -191,6 +200,7 @@ export default function BookDeviceWeeklyPage() {
       }
     }
     
+    // Update reservations state with new bookings
     setReservations(prev => [...prev, ...newBookings]);
 
     if (successCount > 0) {
@@ -202,12 +212,12 @@ export default function BookDeviceWeeklyPage() {
        toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed. Please try again.`, variant: "destructive" });
     }
     
-    setCalendarKey(Date.now()); 
+    setCalendarKey(Date.now()); // Force re-render of calendar to reset its internal state
     setIsProcessingGlobal(false);
   };
 
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading) { // Show skeleton if auth is loading or data is loading and no devices yet
      return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-1/3 mb-4" />
@@ -230,7 +240,7 @@ export default function BookDeviceWeeklyPage() {
         </p>
       ) : (
         <WeeklyBookingCalendar
-          key={calendarKey} 
+          key={calendarKey} // Use key to force re-mount and reset state when needed
           items={devices}
           itemType="device"
           reservations={reservations}
@@ -241,7 +251,7 @@ export default function BookDeviceWeeklyPage() {
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
           itemDisplayName="Device"
-          bookingModalPurposeLabel="Additional Notes (optional)"
+          bookingModalPurposeLabel="Additional Notes (optional)" // Check if this label is right for devices now with checkbox purposes
         />
       )}
 
@@ -264,4 +274,3 @@ export default function BookDeviceWeeklyPage() {
     </div>
   );
 }
-

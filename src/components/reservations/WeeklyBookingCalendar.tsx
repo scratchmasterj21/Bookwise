@@ -92,7 +92,7 @@ interface WeeklyBookingCalendarProps {
     bookedQuantity?: number;
   }) => Promise<void>;
   onDeleteSlot: (reservationId: string) => void;
-  onConfirmMultiBook?: (details: {
+  onConfirmMultiBook?: (details: { // Made optional as it's device-specific
     itemId: string;
     itemName: string;
     slots: { day: Date; period: TimePeriod }[];
@@ -221,10 +221,11 @@ export default function WeeklyBookingCalendar({
   }, [bookingModalOpen]);
 
   useEffect(() => {
-    if (selectedItemId === ALL_ITEMS_ID || !currentSelectedItem || itemType !== 'device') {
-      setIsMultiPeriodMode(false);
+    // If not in multi-period mode, or if "All Items" is selected, or if it's not a device, or no current item, disable multi-period mode
+    if (!isMultiPeriodMode || selectedItemId === ALL_ITEMS_ID || !currentSelectedItem || itemType !== 'device') {
+      setIsMultiPeriodMode(false); // Ensure it's off
     }
-    if (!isMultiPeriodMode) {
+    if (!isMultiPeriodMode) { // Always clear selections if multi-mode is turned off
         setSelectedMultiSlots(new Map());
     }
   }, [selectedItemId, currentSelectedItem, itemType, isMultiPeriodMode]);
@@ -283,7 +284,7 @@ export default function WeeklyBookingCalendar({
       setCurrentBookingSlot({ day, period, item: targetItem, existingReservation });
       if (itemType === 'room') {
         setBookingPurpose(existingReservation.purpose || '');
-      } else {
+      } else { // Device
         setSelectedDevicePurposes(existingReservation.devicePurposes || []);
         setBookingNotes(existingReservation.notes || '');
         setBookingQuantity(existingReservation.bookedQuantity || 1);
@@ -292,13 +293,14 @@ export default function WeeklyBookingCalendar({
       setModalSelectedItemIdForBooking(existingReservation.itemId);
     } else if (actionType === 'book') {
         if (selectedItemId === ALL_ITEMS_ID) {
-             setCurrentBookingSlot({ day, period, item: null });
+             setCurrentBookingSlot({ day, period, item: null }); // No specific item pre-selected
              setModalSelectedItemIdForBooking(undefined);
         } else {
              targetItem = items.find(i => i.id === selectedItemId);
              setCurrentBookingSlot({ day, period, item: targetItem });
              setModalSelectedItemIdForBooking(targetItem?.id);
         }
+        // Reset form fields for new booking
         setBookingPurpose('');
         setSelectedDevicePurposes([]);
         setBookingNotes('');
@@ -317,14 +319,18 @@ export default function WeeklyBookingCalendar({
 
     let finalItemId = editingReservationId ? currentBookingSlot.existingReservation?.itemId : modalSelectedItemIdForBooking;
 
-    if (!finalItemId && selectedItemId === ALL_ITEMS_ID && !editingReservationId) {
+    // If no item ID is set from modal (i.e., "All Items" was selected initially) AND not editing,
+    // AND an item was selected in the main dropdown, use that.
+    if(!finalItemId && !editingReservationId && selectedItemId !== ALL_ITEMS_ID) {
+        finalItemId = selectedItemId;
+    }
+    
+    if (!finalItemId) { // Still no item ID (e.g. "All Items" selected, and nothing picked in modal)
         toast({title: `${itemDisplayName} Selection Required`, description: `Please select a ${itemDisplayName.toLowerCase()} from the dropdown.`, variant: "destructive"});
         setIsSlotProcessing(false);
         return;
     }
-    if(!finalItemId && selectedItemId !== ALL_ITEMS_ID) {
-        finalItemId = selectedItemId;
-    }
+
 
     const itemToBookOrUpdate = items.find(i => i.id === finalItemId);
 
@@ -348,7 +354,7 @@ export default function WeeklyBookingCalendar({
 
       if (itemType === 'room') {
         details.purpose = bookingPurpose.trim();
-      } else {
+      } else { // Device
         details.devicePurposes = selectedDevicePurposes;
         details.notes = bookingNotes.trim();
         details.bookedQuantity = bookingQuantity;
@@ -375,7 +381,7 @@ export default function WeeklyBookingCalendar({
         const allSlotReservations = getReservationsForSlot(day, period);
         if (itemType === 'room') {
             const bookedItemCount = new Set(allSlotReservations.map(res => res.itemId)).size;
-            const totalItemUnits = items.length;
+            const totalItemUnits = items.length; // For rooms, totalItemUnits means number of rooms
             if (isPast) {
                 if (bookedItemCount > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${bookedItemCount} ${itemDisplayName}(s) Booked` };
                 return { status: 'past-available', isPast: true, displayText: "" };
@@ -387,10 +393,10 @@ export default function WeeklyBookingCalendar({
                  return { status: 'partially-booked', isPast: false, displayText: `${bookedItemCount}/${totalItemUnits} Booked` };
             }
             return { status: 'available', isPast: false, displayText: "Available" };
-        } else { 
+        } else { // Device
             let totalPotentialUnits = 0;
             let totalBookedUnits = 0;
-            items.forEach(item => {
+            items.forEach(item => { // items here are all devices
                 const device = item as Device;
                 totalPotentialUnits += device.quantity;
                 const deviceReservations = allSlotReservations.filter(r => r.itemId === device.id);
@@ -402,18 +408,20 @@ export default function WeeklyBookingCalendar({
                 if (totalBookedUnits > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${totalBookedUnits} Unit(s) Booked`, totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
                 return { status: 'past-available', isPast: true, displayText: "", totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
             }
-            if (totalAvailableUnits <= 0 && totalPotentialUnits > 0) {
+            if (totalAvailableUnits <= 0 && totalPotentialUnits > 0) { // All units across all device types are booked
                 return { status: 'all-booked', isPast: false, displayText: "All Device Units Booked", totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
             }
-            if (totalBookedUnits > 0) {
+            if (totalBookedUnits > 0) { // Some units booked, some available across all device types
                  return { status: 'partially-booked', isPast: false, displayText: `${totalAvailableUnits} of ${totalPotentialUnits} Units Available`, totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
             }
+            // All units available or no devices configured
             return { status: 'available', isPast: false, displayText: totalPotentialUnits > 0 ? `${totalPotentialUnits} Units Available` : "No Devices", totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
         }
     }
 
+    // Specific item selected
     const currentItem = items.find(i => i.id === selectedItemId);
-    if (!currentItem) return { status: 'past-available', isPast: true, displayText: ""}; 
+    if (!currentItem) return { status: 'past-available', isPast: true, displayText: ""}; // Should not happen if selectedItemId is valid
 
     const slotReservations = getReservationsForSlot(day, period, selectedItemId);
     const bookingEntries: BookingEntry[] = slotReservations.map(res => ({
@@ -423,14 +431,15 @@ export default function WeeklyBookingCalendar({
         isCurrentUserBooking: res.userId === user?.uid,
         devicePurposes: res.devicePurposes,
         notes: res.notes,
-        purpose: res.purpose, 
+        purpose: res.purpose, // For rooms
         itemName: res.itemName,
     }));
 
     const totalBookedUnits = bookingEntries.reduce((sum, entry) => sum + entry.bookedQuantity, 0);
-    const itemTotalQuantity = itemType === 'device' ? (currentItem as Device).quantity : 1;
+    const itemTotalQuantity = itemType === 'device' ? (currentItem as Device).quantity : 1; // Rooms have quantity 1
     const availableQuantity = itemTotalQuantity - totalBookedUnits;
-    const mainUserReservation = bookingEntries.find(entry => entry.isCurrentUserBooking) ? slotReservations.find(r => r.userId === user?.uid) : undefined;
+    // Find the main reservation for edit/delete: the one belonging to the current user for this item and slot.
+    const mainUserReservation = slotReservations.find(r => r.userId === user?.uid);
 
 
     if (isPast) {
@@ -438,21 +447,22 @@ export default function WeeklyBookingCalendar({
         return { status: 'past-available', isPast: true, itemName: currentItem.name, displayText: "" , itemTotalQuantity, availableQuantity, bookedUnits: totalBookedUnits};
     }
 
-    if (availableQuantity <= 0) {
+    if (availableQuantity <= 0) { // Fully booked for this specific item
         return { status: 'all-booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
     }
-    if (bookingEntries.length > 0) {
+    if (bookingEntries.length > 0) { // Partially booked for this specific item
         return { status: 'booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
     }
+    // Available for this specific item
     return { status: 'available', isPast: false, itemName: currentItem.name, displayText: `Available (${itemTotalQuantity})`, itemTotalQuantity, availableQuantity, bookedUnits: totalBookedUnits };
   }, [selectedItemId, getReservationsForSlot, itemType, items, user]);
 
   const getCellClasses = (day: Date, period: TimePeriod) => {
     const cellData = getCellDisplayData(day, period);
-    let baseClasses = "p-0 border align-top h-[75px] relative group/cell";
+    let baseClasses = "p-0 border align-top h-[75px] relative group/cell"; // Ensure p-0 here, inner div handles padding
 
     if (isToday(day) && cellData.status !== 'past-available' && cellData.status !== 'past-booked' && cellData.status !== 'past-booked-all-view') {
-        baseClasses = cn(baseClasses, "bg-primary/5");
+        baseClasses = cn(baseClasses, "bg-primary/5"); // Highlight for current day, subtle
     }
 
     const currentItemForStyling = items.find(i => i.id === selectedItemId);
@@ -461,24 +471,26 @@ export default function WeeklyBookingCalendar({
     if (cellData.isPast) {
         if (cellData.status === 'past-booked' || cellData.status === 'past-booked-all-view') {
             baseClasses = cn(baseClasses, `bg-slate-100 ${itemStyling.borderClass} border-dashed opacity-60 cursor-default`);
-        } else {
+        } else { // past-available
             baseClasses = cn(baseClasses, "bg-slate-50 border-slate-200 border-dashed cursor-default");
         }
-    } else { 
+    } else { // Not past
+        // Determine if the cell is interactive for booking/editing
         const canInteract = !isMultiPeriodMode || (isMultiPeriodMode && itemType === 'device' && currentSelectedItem && cellData.availableQuantity && cellData.availableQuantity > 0);
-        if (cellData.status === 'booked' && selectedItemId !== ALL_ITEMS_ID) {
+
+        if (cellData.status === 'booked' && selectedItemId !== ALL_ITEMS_ID) { // Partially booked (specific item view)
             const mainUserRes = cellData.bookingEntries?.find(be => be.isCurrentUserBooking);
-            const backgroundClass = mainUserRes ? 'bg-green-50' : itemStyling.backgroundClass;
+            const backgroundClass = mainUserRes ? 'bg-green-50' : itemStyling.backgroundClass; // Green if current user booked, else item-specific
             baseClasses = cn(baseClasses, `${backgroundClass} ${itemStyling.borderClass} border-2`, canInteract ? "cursor-pointer" : "cursor-default");
         } else if (cellData.status === 'available') {
             baseClasses = cn(baseClasses, "bg-background hover:bg-primary/10 border-slate-200 transition-colors duration-150", canInteract ? "cursor-pointer" : "cursor-default");
-        } else if (cellData.status === 'all-booked' && selectedItemId !== ALL_ITEMS_ID) {
+        } else if (cellData.status === 'all-booked' && selectedItemId !== ALL_ITEMS_ID) { // Fully booked (specific item view)
              baseClasses = cn(baseClasses, "bg-red-50 text-red-700 border-red-300", itemStyling.borderClass, cellData.mainReservation && canInteract ? "cursor-pointer" : "cursor-not-allowed");
-        } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID) {
+        } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID) { // All items/units booked (all items view)
              baseClasses = cn(baseClasses, "bg-red-50 text-red-700 border-red-200", canInteract ? "cursor-pointer" : "cursor-default");
-        } else if (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) {
+        } else if (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) { // Some items/units booked (all items view)
             baseClasses = cn(baseClasses, "bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700 transition-colors duration-150", canInteract ? "cursor-pointer" : "cursor-default");
-        } else {
+        } else { // Default for other cases (e.g., available in "all items" view)
             baseClasses = cn(baseClasses, "bg-card hover:bg-muted border-slate-200", canInteract ? "cursor-pointer" : "cursor-default");
              if (selectedItemId === ALL_ITEMS_ID && cellData.status === 'available') {
                 baseClasses = cn(baseClasses, canInteract ? "cursor-pointer" : "cursor-default");
@@ -499,17 +511,20 @@ export default function WeeklyBookingCalendar({
         if (newSelectedSlots.has(slotKey)) {
           newSelectedSlots.delete(slotKey);
         } else {
+          // Ensure availableInSlot is correctly passed
           newSelectedSlots.set(slotKey, { day, period, availableInSlot: cellData.availableQuantity });
         }
         setSelectedMultiSlots(newSelectedSlots);
       } else if (cellData.isPast || (itemType === 'device' && currentSelectedItem && (cellData.availableQuantity === undefined || cellData.availableQuantity <=0))) {
         toast({ title: "Cannot Select Slot", description: "This slot is unavailable or in the past.", variant: "destructive" });
       }
-      return; 
+      return; // In multi-period mode, cell click is for selection/deselection only
     }
 
+    // --- Single Slot Booking/Viewing Logic (not in multi-period mode) ---
     if (cellData.isPast) {
       if(cellData.bookingEntries && cellData.bookingEntries.length > 0) {
+        // Display who booked in the past
         toast({
             title: `Past Booking (${cellData.bookingEntries[0].itemName || itemDisplayName})`,
             description: cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})`).join(', ')
@@ -522,20 +537,24 @@ export default function WeeklyBookingCalendar({
       return;
     }
     
+    // If the current user has a booking in this slot (specific item view)
     if (cellData.mainReservation && (cellData.status === 'booked' || cellData.status === 'all-booked')) {
         if (isAdmin || cellData.mainReservation.userId === user?.uid) {
              handleSlotAction(day, period, 'edit', cellData.mainReservation);
-        } else {
+        } else { // Another user's booking, just show info (if specific item view)
             const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})${be.devicePurposes ? ` - ${be.devicePurposes.join('/')}` : be.purpose ? ` - ${be.purpose}` : ''}`).join('; ');
             toast({ title: "Booking Details", description: `${cellData.bookingEntries && cellData.bookingEntries[0].itemName}: ${bookingDetailsString}` });
         }
-    } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalAvailableUnits !== undefined && cellData.totalAvailableUnits > 0) || (cellData.status === 'available' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalPotentialUnits !== undefined && cellData.totalPotentialUnits > 0 )) {
+    } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'booked' && selectedItemId !== ALL_ITEMS_ID) || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalAvailableUnits !== undefined && cellData.totalAvailableUnits > 0) || (cellData.status === 'available' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalPotentialUnits !== undefined && cellData.totalPotentialUnits > 0 )) {
+        // Slot is available for booking (either fully, or partially in "all items" view, or partially for specific item)
         handleSlotAction(day, period, 'book');
     } else if ((cellData.status === 'all-booked' && selectedItemId !== ALL_ITEMS_ID && !(cellData.mainReservation && (isAdmin || cellData.mainReservation.userId === user?.uid)))) {
+         // Fully booked by others (specific item view)
          const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})`).join('; ');
          const itemNameForToast = items.find(i=>i.id === selectedItemId)?.name;
          toast({ title: "Fully Booked", description: `${itemNameForToast}: ${bookingDetailsString}`, variant: "default" });
     } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'room') {
+        // All rooms booked (all rooms view)
         toast({ title: `No ${itemDisplayName}s Available`, description: `All ${itemDisplayName.toLowerCase()}s are booked for this slot.`, variant: "default" });
     }
   };
@@ -543,29 +562,50 @@ export default function WeeklyBookingCalendar({
   const getMaxBookableQuantity = () => {
     if (!currentBookingSlot) return 1;
     const { day, period, item: modalItem, existingReservation } = currentBookingSlot;
-    const itemForCalc = modalItem || (modalSelectedItemIdForBooking ? items.find(i => i.id === modalSelectedItemIdForBooking) : null) || currentSelectedItem;
+    
+    // Determine the item for calculation:
+    // 1. If editing, use the item from existingReservation.
+    // 2. If booking via "All Items" and an item was picked in modal, use that.
+    // 3. If booking with a specific item pre-selected from main dropdown, use that.
+    let itemForCalc: Item | null | undefined = null;
+    if (existingReservation) {
+        itemForCalc = items.find(i => i.id === existingReservation.itemId);
+    } else if (modalSelectedItemIdForBooking) {
+        itemForCalc = items.find(i => i.id === modalSelectedItemIdForBooking);
+    } else if (currentSelectedItem) {
+        itemForCalc = currentSelectedItem;
+    }
+
 
     if (itemType === 'device' && itemForCalc) {
       const device = itemForCalc as Device;
       const reservationsInSlot = getReservationsForSlot(day, period, device.id);
       let totalBookedByOthers = 0;
       reservationsInSlot.forEach(res => {
-        if (res.id !== existingReservation?.id) {
+        if (res.id !== existingReservation?.id) { // Don't count units from the booking being edited
           totalBookedByOthers += (res.bookedQuantity || 1);
         }
       });
       const maxQty = device.quantity - totalBookedByOthers;
-      return Math.max(0, maxQty); 
+      return Math.max(0, maxQty); // Max quantity available for this new/edited booking
     }
-    return 1; 
+    return 1; // For rooms or if device calculation isn't applicable
   };
 
   const isBookingButtonDisabled = () => {
     if (isSlotProcessing || isProcessingGlobal) return true;
     
-    const itemForModal = modalSelectedItemIdForBooking ? items.find(i => i.id === modalSelectedItemIdForBooking) : currentBookingSlot?.item;
+    // Determine the item for modal:
+    // If editing, it's from existingReservation.itemId.
+    // If new booking, it's modalSelectedItemIdForBooking (if "All Items" view) or currentSelectedItem.id.
+    let itemForModalId = editingReservationId ? currentBookingSlot?.existingReservation?.itemId : modalSelectedItemIdForBooking;
+    if (!itemForModalId && !editingReservationId && selectedItemId !== ALL_ITEMS_ID) {
+        itemForModalId = selectedItemId;
+    }
+    const itemForModal = items.find(i => i.id === itemForModalId);
 
-    if (selectedItemId === ALL_ITEMS_ID && !editingReservationId && !itemForModal) return true;
+
+    if (!itemForModal && !editingReservationId) return true; // No item selected in modal when needed
 
     if (itemType === 'room' && !bookingPurpose.trim()) return true;
     if (itemType === 'device') {
@@ -574,6 +614,7 @@ export default function WeeklyBookingCalendar({
       
       const maxQty = getMaxBookableQuantity();
       if (bookingQuantity > maxQty) return true;
+      // If not editing AND maxQty is 0, disable (no units can be booked)
       if (!editingReservationId && maxQty === 0) return true; 
     }
     return false;
@@ -581,15 +622,16 @@ export default function WeeklyBookingCalendar({
 
   const handleOpenMultiBookModal = () => {
     if (!currentSelectedItem || selectedMultiSlots.size === 0) return;
-    setMultiBookQuantity(1);
+    setMultiBookQuantity(1); // Reset quantity for modal
     setMultiBookPurposes([]);
     setMultiBookNotes('');
     setMultiBookModalOpen(true);
   };
   
+  // Calculate max quantity for multi-booking based on the *minimum* availability across all selected slots
   const maxQuantityForMultiBook = useMemo(() => {
     if (!isMultiPeriodMode || selectedMultiSlots.size === 0 || !currentSelectedItem || itemType !== 'device') {
-      return 1;
+      return 1; // Default or not applicable
     }
     let minAvailable = Infinity;
     selectedMultiSlots.forEach(slotInfo => {
@@ -626,7 +668,8 @@ export default function WeeklyBookingCalendar({
          devicePurposes: multiBookPurposes,
          notes: multiBookNotes,
        });
-       setSelectedMultiSlots(new Map()); 
+       setSelectedMultiSlots(new Map()); // Clear selection after successful booking
+       setIsMultiPeriodMode(false); // Optionally turn off multi-mode
      } catch (error) {
         // error should be handled by parent
      } finally {
@@ -747,11 +790,12 @@ export default function WeeklyBookingCalendar({
                                 <Checkbox
                                   checked={selectedMultiSlots.has(slotKey)}
                                   onCheckedChange={() => {
-                                    if (isSlotBookableForMultiSelect) {
+                                    if (isSlotBookableForMultiSelect) { // Redundant check but safe
                                       const newSelectedSlots = new Map(selectedMultiSlots);
                                       if (newSelectedSlots.has(slotKey)) {
                                         newSelectedSlots.delete(slotKey);
                                       } else {
+                                        // Make sure cellData.availableQuantity is correctly populated for this context
                                         newSelectedSlots.set(slotKey, { day, period, availableInSlot: cellData.availableQuantity || 0 });
                                       }
                                       setSelectedMultiSlots(newSelectedSlots);
@@ -765,7 +809,7 @@ export default function WeeklyBookingCalendar({
                             { (cellData.status === 'booked' || cellData.status === 'all-booked') && selectedItemId !== ALL_ITEMS_ID && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                                <div className={cn("flex flex-col w-full h-full space-y-0.5 text-[10px] leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
                                   <span className={cn("block font-semibold", currentItemStyling.textClass)}>
-                                    {currentSelectedItem?.name}
+                                    {cellData.bookingEntries[0].itemName}
                                   </span>
                                   <span className="font-medium text-muted-foreground">Booked by:</span>
                                   <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
@@ -789,7 +833,9 @@ export default function WeeklyBookingCalendar({
                               </div>
                             ) : (cellData.status === 'available' && !cellData.isPast) ? (
                                 <div className={cn("flex-grow flex flex-col items-center justify-center", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
-                                    <span className={cn("font-medium text-xs", selectedItemId !== ALL_ITEMS_ID && cellData.displayText !== 'No Devices' && itemType === 'room' ? "text-primary" : (selectedItemId !== ALL_ITEMS_ID && itemType === 'device' ? "text-primary" : "text-muted-foreground"))}>
+                                    <span className={cn("font-medium text-xs", 
+                                      (selectedItemId !== ALL_ITEMS_ID && (cellData.displayText?.startsWith("Available") || cellData.displayText === "No Devices") ) ? "text-primary" : "text-muted-foreground"
+                                    )}>
                                       {cellData.displayText}
                                     </span>
                                 </div>
@@ -866,7 +912,7 @@ export default function WeeklyBookingCalendar({
                   <Label htmlFor="modal-item-select" className="font-medium">Select {itemDisplayName}</Label>
                   <Select
                     value={modalSelectedItemIdForBooking}
-                    onValueChange={(value) => { setModalSelectedItemIdForBooking(value); setBookingQuantity(1); }}
+                    onValueChange={(value) => { setModalSelectedItemIdForBooking(value); setBookingQuantity(1); }} // Reset quantity when item changes
                     required
                   >
                     <SelectTrigger id="modal-item-select" className="w-full">
@@ -874,7 +920,7 @@ export default function WeeklyBookingCalendar({
                     </SelectTrigger>
                     <SelectContent>
                       {items
-                        .filter(item => {
+                        .filter(item => { // Filter to show only items with availability in this slot
                           const specificItemReservations = getReservationsForSlot(currentBookingSlot.day, currentBookingSlot.period, item.id);
                           const bookedUnitsForItem = specificItemReservations.reduce((sum, r) => sum + (r.bookedQuantity || 1), 0);
                           const itemTotalQty = itemType === 'device' ? (item as Device).quantity : 1;
@@ -900,7 +946,7 @@ export default function WeeklyBookingCalendar({
                             </SelectItem>
                            );
                         })}
-                       {items.filter(item => {
+                       {items.filter(item => { // Check if any items are available for the dropdown
                           const specificItemReservations = getReservationsForSlot(currentBookingSlot.day, currentBookingSlot.period, item.id);
                           const bookedUnitsForItem = specificItemReservations.reduce((sum, r) => sum + (r.bookedQuantity || 1), 0);
                           const itemTotalQty = itemType === 'device' ? (item as Device).quantity : 1;
@@ -1005,7 +1051,7 @@ export default function WeeklyBookingCalendar({
         </DialogContent>
       </Dialog>
 
-      {itemType === 'device' && currentSelectedItem && (
+      {itemType === 'device' && currentSelectedItem && onConfirmMultiBook && (
         <Dialog open={multiBookModalOpen} onOpenChange={setMultiBookModalOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -1031,12 +1077,12 @@ export default function WeeklyBookingCalendar({
                   value={multiBookQuantity}
                   onChange={(e) => setMultiBookQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
                   min="1"
-                  max={maxQuantityForMultiBook}
+                  max={maxQuantityForMultiBook} // Validate against min availability across selected slots
                   className="text-sm"
-                  disabled={isSlotProcessing || isProcessingGlobal}
+                  disabled={isSlotProcessing || isProcessingGlobal || maxQuantityForMultiBook === 0}
                 />
                 {multiBookQuantity > maxQuantityForMultiBook && <p className="text-xs text-red-500">Max available quantity across selected slots is {maxQuantityForMultiBook}.</p>}
-                 {maxQuantityForMultiBook === 0 && <p className="text-xs text-red-500">No units consistently available across all selected slots.</p>}
+                 {maxQuantityForMultiBook === 0 && <p className="text-xs text-red-500">No units consistently available across all selected slots for booking this quantity.</p>}
               </div>
               <div className="space-y-2">
                 <Label className="font-medium">Purpose (select all that apply):</Label>
@@ -1087,4 +1133,3 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
-
