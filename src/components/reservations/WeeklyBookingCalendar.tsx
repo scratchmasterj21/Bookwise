@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -521,8 +522,6 @@ export default function WeeklyBookingCalendar({
       return;
     }
     
-    const slotReservations = getReservationsForSlot(day, period, selectedItemId !== ALL_ITEMS_ID ? selectedItemId : undefined);
-
     if (cellData.mainReservation && (cellData.status === 'booked' || cellData.status === 'all-booked')) {
         if (isAdmin || cellData.mainReservation.userId === user?.uid) {
              handleSlotAction(day, period, 'edit', cellData.mainReservation);
@@ -1088,3 +1087,4 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
+
