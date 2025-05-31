@@ -413,7 +413,7 @@ export default function DailyBookingTable({
     if (cellData.isPast) {
       if(cellData.bookingEntries && cellData.bookingEntries.length > 0) {
         const description = itemType === 'device'
-            ? cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})`).join(', ')
+            ? cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})${be.devicePurposes && be.devicePurposes.length > 0 ? ` - ↳ ${be.devicePurposes.join(', ')}` : ''}${be.notes ? ` - ↳ Notes: ${be.notes}`:''}`).join('; ')
             : `${getLastName(cellData.bookingEntries[0].bookedBy)} - ${cellData.bookingEntries[0].purpose}`;
         toast({
             title: `Past Booking (${cellData.bookingEntries[0].itemName || itemDisplayName})`,
@@ -607,14 +607,14 @@ export default function DailyBookingTable({
             <tbody>
               {items.map(item => (
                 <tr key={item.id} className="even:bg-background odd:bg-muted/20">
-                  <td className="p-2 border-r text-left sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[250px] whitespace-nowrap">
-                     <div className="flex items-center gap-2">
+                  <td className="p-2 border-r text-center sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[250px] whitespace-nowrap">
+                     <div className="flex items-center justify-center gap-2">
                         {getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name) &&
                            React.createElement(getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name)!, { className: "h-5 w-5 text-primary"})}
                         {itemType === 'device' ? `${(item as Device).roomName || 'N/A'} - ${item.name}` : item.name}
                      </div>
-                     {itemType === 'room' && <div className="text-xs text-muted-foreground ml-7">{(item as Room).buildingName}</div>}
-                     {itemType === 'device' && <div className="text-xs text-muted-foreground ml-7">Type: {(item as Device).type} (Total Qty: {(item as Device).quantity})</div>}
+                     {itemType === 'room' && <div className="text-xs text-muted-foreground text-center">{(item as Room).buildingName}</div>}
+                     {itemType === 'device' && <div className="text-xs text-muted-foreground text-center">Type: {(item as Device).type} (Total Qty: {(item as Device).quantity})</div>}
                   </td>
                   {periods.map(period => {
                     const slotKey = `${item.id}-${period.name}`;
@@ -925,3 +925,4 @@ export default function DailyBookingTable({
     </Card>
   );
 }
+
