@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers } from 'lucide-react'; // Added Layers for Floor
+import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers } from 'lucide-react';
 import Image from 'next/image';
 import { Badge } from '../ui/badge';
 
@@ -63,7 +63,7 @@ export default function ItemManagementTable({
           <TableHead>Image</TableHead>
           <TableHead>Name</TableHead>
           <TableHead>Location</TableHead>
-          <TableHead>Floor</TableHead> {/* Added Floor header */}
+          <TableHead className="flex items-center gap-1"><Layers className="h-4 w-4 text-muted-foreground" /> Floors</TableHead> {/* Updated Floor header */}
           <TableHead>Notes</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -121,7 +121,7 @@ export default function ItemManagementTable({
           {commonImageCell}
           <TableCell className="font-medium">{b.name}</TableCell>
           <TableCell>{b.location || 'N/A'}</TableCell>
-          <TableCell>{b.floor || 'N/A'}</TableCell> {/* Added Floor cell */}
+          <TableCell>{b.numberOfFloors || 'N/A'}</TableCell> {/* Updated Floor cell */}
           <TableCell className="truncate max-w-xs">{b.notes || 'N/A'}</TableCell>
           <TableCell className="text-right space-x-1">
             <Button variant="ghost" size="icon" onClick={() => onEdit(b)} className="hover:text-primary">

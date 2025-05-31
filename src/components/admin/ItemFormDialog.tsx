@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Added RadioGroup
 import type { Device, Room, Building, DeviceType } from '@/types';
 import { Loader2 } from 'lucide-react';
 
@@ -57,7 +58,7 @@ export default function ItemFormDialog({
 
   // Building specific
   const [location, setLocation] = useState('');
-  const [floor, setFloor] = useState(''); // Added floor state
+  const [numberOfFloors, setNumberOfFloors] = useState<string>("1"); // Changed from floor, type string for RadioGroup
   const [notes, setNotes] = useState('');
 
   // Device specific
@@ -90,7 +91,7 @@ export default function ItemFormDialog({
         if (itemType === 'building') {
             const b = itemData as Building;
             setLocation(b.location || '');
-            setFloor(b.floor || ''); // Initialize floor
+            setNumberOfFloors(b.numberOfFloors?.toString() || "1"); // Initialize numberOfFloors
             setNotes(b.notes || '');
             if (!itemData.imageUrl) setImageUrl(''); 
         } else if (itemType === 'room') {
@@ -112,7 +113,7 @@ export default function ItemFormDialog({
         setCapacity(0);
         setAmenities('');
         setLocation('');
-        setFloor(''); // Reset floor
+        setNumberOfFloors("1"); // Reset numberOfFloors to default "1"
         setNotes('');
         setSelectedBuildingId(undefined);
         setSelectedRoomId(undefined);
@@ -146,9 +147,11 @@ export default function ItemFormDialog({
     let dataFields: Partial<Omit<Building, 'id'>> | Partial<Omit<Room, 'id'>> | Partial<Omit<Device, 'id'>>;
 
     if (itemType === 'building') {
-      const payload: Partial<Omit<Building, 'id'>> = { name };
+      const payload: Partial<Omit<Building, 'id'> & { numberOfFloors: 1 | 2 }> = { 
+        name,
+        numberOfFloors: parseInt(numberOfFloors, 10) as 1 | 2, // Parse to number
+      };
       if (location && location.trim()) payload.location = location.trim();
-      if (floor && floor.trim()) payload.floor = floor.trim(); // Add floor to payload
       if (notes && notes.trim()) payload.notes = notes.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
       dataFields = payload;
@@ -242,8 +245,22 @@ export default function ItemFormDialog({
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="floor" className="text-right">Floor</Label>
-                <Input id="floor" value={floor} onChange={(e) => setFloor(e.target.value)} className="col-span-3" placeholder="e.g., Ground, 1st, 2nd" />
+                <Label htmlFor="numberOfFloors" className="text-right">Number of Floors</Label>
+                <RadioGroup 
+                    value={numberOfFloors} 
+                    onValueChange={setNumberOfFloors} 
+                    className="col-span-3 flex space-x-4"
+                    required
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="1" id="floor1" />
+                    <Label htmlFor="floor1">1 Floor</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="2" id="floor2" />
+                    <Label htmlFor="floor2">2 Floors</Label>
+                  </div>
+                </RadioGroup>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="notes" className="text-right">Notes</Label>

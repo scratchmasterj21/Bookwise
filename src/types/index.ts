@@ -1,12 +1,11 @@
 
-
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
   isAdmin?: boolean;
-  createdAt?: Date | any; // Allow for Firestore Timestamp or Date object
+  createdAt?: Date | any; 
 }
 
 export type DeviceType = 'Laptop' | 'Tablet' | 'Monitor' | 'Projector' | 'Other';
@@ -15,7 +14,7 @@ export interface Building {
   id: string;
   name: string;
   location?: string;
-  floor?: string; // Added floor field
+  numberOfFloors: 1 | 2; // Changed from floor?: string
   notes?: string;
   imageUrl?: string; 
 }
@@ -56,8 +55,8 @@ export interface Reservation {
   itemId: string; 
   itemName?: string; 
   itemType: 'device' | 'room';
-  startTime: Date; // Stored as Firestore Timestamp, converted to Date in app
-  endTime: Date;   // Stored as Firestore Timestamp, converted to Date in app
+  startTime: Date; 
+  endTime: Date;   
   status: ReservationStatus;
   notes?: string;
   purpose?: string; 
@@ -74,4 +73,3 @@ export interface TimePeriod {
   start: string; 
   end: string;   
 }
-
