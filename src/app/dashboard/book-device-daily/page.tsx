@@ -2,44 +2,47 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import WeeklyBookingCalendar from '@/components/reservations/WeeklyBookingCalendar';
-import type { Room, Reservation } from '@/types';
+import DailyBookingTable from '@/components/reservations/DailyBookingTable';
+import type { Device, Reservation } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
-import { Loader2 } from 'lucide-react';
+import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
+import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { TIME_PERIODS } from '@/lib/constants';
 
-
-export default function BookRoomPage() {
+export default function BookDeviceDailyPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [devices, setDevices] = useState<Device[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
 
-
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [fetchedRooms, fetchedReservations] = await Promise.all([
-        fetchRoomsFromDB(),
+      const [fetchedDevices, fetchedReservations] = await Promise.all([
+        fetchDevicesFromDB(),
         fetchReservationsFromDB() 
       ]);
-      const bookableRooms = fetchedRooms.filter(room => room.status === 'available');
-      setRooms(bookableRooms); 
-      setReservations(fetchedReservations.filter(r => r.itemType === 'room'));
+      const bookableDevices = fetchedDevices.filter(device => device.status === 'available' && device.quantity > 0);
+      setDevices(bookableDevices); 
+      setReservations(fetchedReservations.filter(r => r.itemType === 'device'));
     } catch (error) {
-      console.error("Error fetching data for booking page:", error);
-      toast({ title: "Error", description: "Could not load rooms or reservations.", variant: "destructive" });
-      setRooms([]); 
+      console.error("Error fetching data for daily device booking page:", error);
+      toast({ title: "Error", description: "Could not load devices or reservations.", variant: "destructive" });
+      setDevices([]); 
       setReservations([]);
     } finally {
       setIsLoading(false);
@@ -53,11 +56,11 @@ export default function BookRoomPage() {
   }, [authLoading, fetchData]);
 
   const handleBookSlot = async (bookingDetails: {
-    roomId: string;
-    roomName: string;
+    itemId: string;
+    itemName: string;
     startTime: Date;
     endTime: Date;
-    purpose: string;
+    purpose: string; // notes
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
@@ -68,13 +71,13 @@ export default function BookRoomPage() {
       userId: user.uid,
       userName: user.displayName || user.email || "User",
       userEmail: user.email || undefined,
-      itemId: bookingDetails.roomId,
-      itemName: bookingDetails.roomName,
-      itemType: 'room', 
+      itemId: bookingDetails.itemId,
+      itemName: bookingDetails.itemName,
+      itemType: 'device', 
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
       status: 'approved', 
-      purpose: bookingDetails.purpose,
+      purpose: bookingDetails.purpose, // notes
       bookedBy: user.displayName || user.email || "User",
     };
 
@@ -82,35 +85,35 @@ export default function BookRoomPage() {
       const addedReservation = await addReservation(newReservationData);
       setReservations(prev => [...prev, addedReservation]); 
       toast({
-        title: 'Room Booked!',
-        description: `${bookingDetails.roomName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
+        title: 'Device Booked!',
+        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Notes: ${bookingDetails.purpose}`,
       });
     } catch (error) {
-       console.error("Error creating reservation:", error);
-       toast({ title: "Booking Failed", description: "Could not create reservation. Please try again.", variant: "destructive"});
+       console.error("Error creating device reservation:", error);
+       toast({ title: "Booking Failed", description: "Could not create device reservation. Please try again.", variant: "destructive"});
        throw error; 
     } finally {
         setIsProcessingGlobal(false);
     }
   };
 
-  const handleUpdateSlot = async (reservationId: string, newPurpose: string) => {
+  const handleUpdateSlot = async (reservationId: string, newNotes: string) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
       throw new Error("User not logged in");
     }
     setIsProcessingGlobal(true);
     try {
-      await updateReservationPurpose(reservationId, newPurpose);
+      await updateReservationPurpose(reservationId, newNotes); // 'purpose' field stores notes
       setReservations(prev => 
-        prev.map(res => res.id === reservationId ? { ...res, purpose: newPurpose } : res)
+        prev.map(res => res.id === reservationId ? { ...res, purpose: newNotes } : res)
       );
       toast({
         title: 'Booking Updated!',
-        description: `Booking purpose has been updated.`,
+        description: `Booking notes have been updated.`,
       });
     } catch (error) {
-      console.error("Error updating reservation:", error);
+      console.error("Error updating device reservation:", error);
       toast({ title: "Update Failed", description: "Could not update booking. Please try again.", variant: "destructive"});
       throw error;
     } finally {
@@ -118,7 +121,7 @@ export default function BookRoomPage() {
     }
   };
 
-  const handleDeleteSlot = (reservationId: string) => {
+  const handleDeleteSlotRequest = (reservationId: string) => {
     setReservationToDelete(reservationId);
     setShowDeleteConfirm(true);
   };
@@ -129,9 +132,9 @@ export default function BookRoomPage() {
     try {
       await deleteReservationFromDB(reservationToDelete);
       setReservations(prev => prev.filter(res => res.id !== reservationToDelete));
-      toast({ title: "Booking Deleted", description: "The reservation has been successfully deleted.", variant: "destructive" });
+      toast({ title: "Device Booking Deleted", description: "The reservation has been successfully deleted.", variant: "destructive" });
     } catch (error) {
-      console.error("Error deleting reservation:", error);
+      console.error("Error deleting device reservation:", error);
       toast({ title: "Delete Failed", description: "Could not delete booking. Please try again.", variant: "destructive"});
     } finally {
       setIsProcessingGlobal(false);
@@ -140,11 +143,13 @@ export default function BookRoomPage() {
     }
   };
   
-  if (authLoading || isLoading) {
+  if (authLoading || (isLoading && devices.length === 0)) {
      return (
         <div className="space-y-4">
-          <Skeleton className="h-10 w-1/3 mb-4" />
-          <Skeleton className="h-12 w-1/3 mb-2" />
+          <div className="flex justify-between items-center mb-4">
+            <Skeleton className="h-10 w-1/3" />
+            <Skeleton className="h-10 w-48" />
+          </div>
           <Skeleton className="h-[500px] w-full" />
         </div>
     );
@@ -152,25 +157,56 @@ export default function BookRoomPage() {
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
-        {isProcessingGlobal && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <h2 className="text-2xl font-semibold font-headline">Daily Device Bookings</h2>
+        <div className="flex items-center gap-2">
+          {isProcessingGlobal && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal shadow-sm",
+                  !selectedDate && "text-muted-foreground"
+                )}
+                disabled={isProcessingGlobal}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                disabled={isProcessingGlobal}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
       
-      {(!isLoading && rooms.length === 0) ? (
+      {(!isLoading && devices.length === 0) ? (
          <p className="text-muted-foreground text-center mt-6">
-            No rooms currently available for booking. Please contact an administrator if you believe this is an error.
+            No devices currently available for booking.
         </p>
+      ) : isLoading ? (
+         <Skeleton className="h-[500px] w-full" />
       ) : (
-        <WeeklyBookingCalendar 
-          items={rooms}
-          itemType="room"
+        <DailyBookingTable 
+          selectedDate={selectedDate}
+          items={devices} // Pass devices
+          itemType="device" // Specify itemType
           reservations={reservations}
           onBookSlot={handleBookSlot}
           onUpdateSlot={handleUpdateSlot}
-          onDeleteSlot={handleDeleteSlot}
+          onDeleteSlot={handleDeleteSlotRequest}
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
+          itemDisplayName="Device"
+          bookingModalPurposeLabel="Notes for Booking (optional)"
         />
       )}
 
@@ -179,7 +215,7 @@ export default function BookRoomPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the booking.
+              This action cannot be undone. This will permanently delete this device booking.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

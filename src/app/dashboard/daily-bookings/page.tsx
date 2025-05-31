@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import DailyBookingTable from '@/components/reservations/DailyBookingTable';
-import type { Room, Reservation, TimePeriod } from '@/types';
+import type { Room, Reservation } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,17 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-
-// This constant is also used in WeeklyBookingCalendar parent page. Could be moved to a shared location.
-const TIME_PERIODS: TimePeriod[] = [
-  { name: '1st Period', label: '09:00 - 09:45', start: '09:00', end: '09:45' },
-  { name: '2nd Period', label: '09:50 - 10:35', start: '09:50', end: '10:35' },
-  { name: '3rd Period', label: '10:55 - 11:40', start: '10:55', end: '11:40' },
-  { name: '4th Period (LG)', label: '11:45 - 12:30', start: '11:45', end: '12:30' },
-  { name: '4th Period (UG)', label: '12:35 - 13:20', start: '12:35', end: '13:20' },
-  { name: '5th Period', label: '13:25 - 14:10', start: '13:25', end: '14:10' },
-  { name: '6th Period', label: '14:15 - 15:00', start: '14:15', end: '15:00' },
-];
+import { TIME_PERIODS } from '@/lib/constants';
 
 export default function DailyBookingsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -48,7 +38,7 @@ export default function DailyBookingsPage() {
       ]);
       const bookableRooms = fetchedRooms.filter(room => room.status === 'available');
       setRooms(bookableRooms); 
-      setReservations(fetchedReservations);
+      setReservations(fetchedReservations.filter(r => r.itemType === 'room'));
     } catch (error) {
       console.error("Error fetching data for daily booking page:", error);
       toast({ title: "Error", description: "Could not load rooms or reservations.", variant: "destructive" });
@@ -207,7 +197,8 @@ export default function DailyBookingsPage() {
       ) : (
         <DailyBookingTable 
           selectedDate={selectedDate}
-          rooms={rooms}
+          items={rooms}
+          itemType="room"
           reservations={reservations}
           onBookSlot={handleBookSlot}
           onUpdateSlot={handleUpdateSlot}
