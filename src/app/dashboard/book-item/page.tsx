@@ -29,7 +29,7 @@ export default function BookItemPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBooking, setIsBooking] = useState(false); // For individual slot booking
+  const [isBooking, setIsBooking] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -112,7 +112,7 @@ export default function BookItemPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
+        <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2> {/* Title remains same but context from layout changes */}
         {isBooking && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
       </div>
       
@@ -132,4 +132,3 @@ export default function BookItemPage() {
     </div>
   );
 }
-

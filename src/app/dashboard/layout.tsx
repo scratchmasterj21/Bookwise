@@ -5,17 +5,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode } from 'react';
-import { CalendarDays, CalendarPlus } from 'lucide-react'; // Changed Laptop, DoorOpen to CalendarPlus
+import { CalendarDays, CalendarPlus } from 'lucide-react';
 
 const dashboardTabs = [
   { name: 'My Reservations', href: '/dashboard', icon: CalendarDays },
-  { name: 'Book Item', href: '/dashboard/book-item', icon: CalendarPlus }, // New unified booking tab
+  { name: 'Book a Room', href: '/dashboard/book-item', icon: CalendarPlus }, // Updated name
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // Determine active tab, default to '/dashboard' if specific sub-route isn't matched
   const activeTabValue = dashboardTabs.find(tab => pathname.startsWith(tab.href))?.href || '/dashboard';
   
   return (
@@ -23,7 +22,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="space-y-6 animate-subtle-slide-up">
         <h1 className="text-3xl font-headline font-semibold">User Dashboard</h1>
         <Tabs value={activeTabValue} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:max-w-xs"> {/* Adjusted grid-cols */}
+          <TabsList className="grid w-full grid-cols-2 md:max-w-xs">
             {dashboardTabs.map((tab) => (
               <TabsTrigger key={tab.href} value={tab.href} asChild>
                 <Link href={tab.href} className="flex items-center gap-2">
@@ -33,7 +32,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </TabsTrigger>
             ))}
           </TabsList>
-          {/* Content is rendered by child page.tsx based on route */}
           <div className="mt-6">{children}</div>
         </Tabs>
       </div>
