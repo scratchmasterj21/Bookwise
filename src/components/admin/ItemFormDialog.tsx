@@ -19,15 +19,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Device, Room, Building, DeviceType } from '@/types';
 import { Loader2 } from 'lucide-react';
 
-type Item = Partial<Device | Room | Building>; // This can include 'id' for editing
-type ItemCreationData = Omit<Device, 'id'> | Omit<Room, 'id'> | Omit<Building, 'id'>; // For new items, 'id' is omitted
+type Item = Partial<Device | Room | Building>; 
+type ItemCreationData = Omit<Device, 'id'> | Omit<Room, 'id'> | Omit<Building, 'id'>;
 type ItemType = 'device' | 'room' | 'building';
 
 interface ItemFormDialogProps {
   itemType: ItemType;
   itemData?: Item | null;
   triggerButton?: React.ReactNode;
-  onSave: (itemData: Item | ItemCreationData) => Promise<void>; // Modified to accept both types
+  onSave: (itemData: Item | ItemCreationData) => Promise<void>; 
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   buildings?: Building[];
@@ -75,59 +75,64 @@ export default function ItemFormDialog({
 
   useEffect(() => {
     if (open) {
-        if (itemData) { 
-            setName(itemData.name || '');
-            setImageUrl(itemData.imageUrl || '');
+      setIsSaving(false); // Reset saving state when dialog opens/item changes
+      if (itemData) { 
+        setName(itemData.name || '');
+        // Common fields for Room & Device
+        if ('description' in itemData && typeof itemData.description === 'string') setDescription(itemData.description); else setDescription('');
+        if ('status' in itemData && itemData.status) setStatus(itemData.status); else setStatus('available');
+        if ('imageUrl' in itemData && typeof itemData.imageUrl === 'string') setImageUrl(itemData.imageUrl); else setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
 
-            if (itemType === 'building') {
-                const b = itemData as Building;
-                setLocation(b.location || '');
-                setNotes(b.notes || '');
-            } else if (itemType === 'room') {
-                const r = itemData as Room;
-                setDescription(r.description || '');
-                setStatus(r.status || 'available');
-                setCapacity(r.capacity || 0);
-                setAmenities(r.amenities?.join(', ') || '');
-                setSelectedBuildingId(r.buildingId || undefined);
-            } else if (itemType === 'device') {
-                const d = itemData as Device;
-                setDescription(d.description || '');
-                setStatus(d.status || 'available');
-                setSpecificType(d.type || '');
-                setSelectedBuildingId(d.buildingId || undefined);
-            }
-        } else { 
-            setName('');
-            setDescription('');
-            setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
-            setStatus('available');
-            setSpecificType('');
-            setCapacity(0);
-            setAmenities('');
-            setLocation('');
-            setNotes('');
-            setSelectedBuildingId(undefined);
-            setSelectedRoomId(undefined);
+
+        if (itemType === 'building') {
+            const b = itemData as Building;
+            setLocation(b.location || '');
+            setNotes(b.notes || '');
+            // imageUrl already handled if present in itemData, else set for building
+            if (!itemData.imageUrl) setImageUrl(''); 
+        } else if (itemType === 'room') {
+            const r = itemData as Room;
+            setCapacity(r.capacity || 0);
+            setAmenities(r.amenities?.join(', ') || '');
+            setSelectedBuildingId(r.buildingId || undefined);
+        } else if (itemType === 'device') {
+            const d = itemData as Device;
+            setSpecificType(d.type || '');
+            setSelectedBuildingId(d.buildingId || undefined);
+            // setSelectedRoomId will be handled by the next useEffect
         }
+      } else { // Reset for new item
+        setName('');
+        setDescription('');
+        setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
+        setStatus('available');
+        setSpecificType('');
+        setCapacity(0);
+        setAmenities('');
+        setLocation('');
+        setNotes('');
+        setSelectedBuildingId(undefined);
+        setSelectedRoomId(undefined);
+      }
     }
   }, [open, itemData, itemType]); 
 
   useEffect(() => {
-    if (open && itemType === 'device') {
-        if (itemData && itemData.id) { 
-            const d = itemData as Device;
-            if (d.buildingId === selectedBuildingId || !selectedBuildingId) {
-              const currentBuildingRooms = d.buildingId ? allRooms.filter(room => room.buildingId === d.buildingId) : [];
-              if (d.roomId && currentBuildingRooms.find(r => r.id === d.roomId)) {
-                  setSelectedRoomId(d.roomId);
-              } else {
-                  setSelectedRoomId(undefined); 
-              }
-            } else {
-              setSelectedRoomId(undefined);
-            }
+    if (open && itemType === 'device' && itemData && 'roomId' in itemData) {
+        const d = itemData as Device;
+        // Only set room if building matches or if no building is selected yet (allowing initial load)
+        if (d.buildingId === selectedBuildingId || !selectedBuildingId) {
+          const currentBuildingRooms = d.buildingId ? allRooms.filter(room => room.buildingId === d.buildingId) : [];
+          if (d.roomId && currentBuildingRooms.find(r => r.id === d.roomId)) {
+              setSelectedRoomId(d.roomId);
+          } else {
+              setSelectedRoomId(undefined); 
+          }
+        } else { // Building has changed, reset room
+          setSelectedRoomId(undefined);
         }
+    } else if (open && itemType === 'device' && !itemData) { // New device
+        setSelectedRoomId(undefined); // Reset room for new device
     }
   }, [open, itemData, itemType, selectedBuildingId, allRooms]);
 
@@ -136,53 +141,51 @@ export default function ItemFormDialog({
     e.preventDefault();
     setIsSaving(true);
     
-    let dataFields: Omit<Building, 'id'> | Omit<Room, 'id'> | Omit<Device, 'id'> = {
-      name,
-      imageUrl: imageUrl || undefined,
-    } as any; // Base fields, will be narrowed down
+    let dataFields: Omit<Building, 'id'> | Omit<Room, 'id'> | Omit<Device, 'id'>;
 
     if (itemType === 'building') {
-      dataFields = {
-        ...dataFields,
-        name, // Ensure name is explicitly included if not in the base spread
-        location,
-        notes,
-      } as Omit<Building, 'id'>;
+      const payload: Omit<Building, 'id'> = { name };
+      if (location && location.trim()) payload.location = location.trim();
+      if (notes && notes.trim()) payload.notes = notes.trim();
+      if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
+      dataFields = payload;
     } else if (itemType === 'room') {
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
-      dataFields = {
-        ...dataFields,
+      const payload: Omit<Room, 'id'> = {
         name,
-        description,
-        status,
-        capacity,
+        capacity: capacity || 0,
         amenities: amenities.split(',').map(a => a.trim()).filter(a => a),
-        buildingId: selectedBuildingId,
+        buildingId: selectedBuildingId!, // Form validation should ensure this
         buildingName: selectedBuilding?.name,
-        category: (itemData as Room)?.category || '', // Retain category if it exists
-      } as Omit<Room, 'id'>;
+        category: (itemData as Room)?.category || '', // Retain category
+        status,
+      };
+      if (description && description.trim()) payload.description = description.trim();
+      if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
+      dataFields = payload;
     } else { // device
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const selectedRoom = allRooms.find(r => r.id === selectedRoomId);
-      dataFields = {
-        ...dataFields,
+      const payload: Omit<Device, 'id'> = {
         name,
-        description,
-        status,
-        type: specificType as DeviceType,
-        buildingId: selectedBuildingId,
+        type: specificType as DeviceType, // Form validation should ensure this
+        buildingId: selectedBuildingId!, 
         buildingName: selectedBuilding?.name,
-        roomId: selectedRoomId,
+        roomId: selectedRoomId!,
         roomName: selectedRoom?.name,
-      } as Omit<Device, 'id'>;
+        status,
+      };
+      if (description && description.trim()) payload.description = description.trim();
+      if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
+      dataFields = payload;
     }
     
     let finalPayload: Item | ItemCreationData;
 
     if (isEditing && itemData?.id) {
-      finalPayload = { ...dataFields, id: itemData.id } as Item; // Add id only if editing
+      finalPayload = { ...dataFields, id: itemData.id } as Item; 
     } else {
-      finalPayload = dataFields; // No id if creating (already Omit<Item, 'id'> type)
+      finalPayload = dataFields as ItemCreationData; 
     }
     
     try {
@@ -190,14 +193,14 @@ export default function ItemFormDialog({
       onOpenChange(false); 
     } catch (error) {
       console.error(`Error during ${itemType} save operation in dialog:`, error);
-      // Toast for error is usually handled in the page calling onSave
+      // Toast for error is usually handled by the page calling onSave
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isSaving) onOpenChange(isOpen); }}>
       {triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
@@ -221,7 +224,13 @@ export default function ItemFormDialog({
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="imageUrl" className="text-right">Image URL</Label>
-            <Input id="imageUrl" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="col-span-3" placeholder={itemType !== 'building' ? "https://placehold.co/600x400.png" : "Optional image URL"}/>
+            <Input 
+              id="imageUrl" 
+              value={imageUrl} 
+              onChange={(e) => setImageUrl(e.target.value)} 
+              className="col-span-3" 
+              placeholder={itemType !== 'building' ? "https://placehold.co/..." : "Optional image URL"}
+            />
           </div>
           
           {itemType === 'building' && (
@@ -329,5 +338,3 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
-
-    
