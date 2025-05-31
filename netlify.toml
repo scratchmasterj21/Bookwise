@@ -1,0 +1,32 @@
+# Netlify configuration file
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  # Command to build your Next.js site
+  command = "next build"
+  
+  # Directory (relative to root of your repo) that Netlify_FIRST_PARTY_BUILD_SYSTEM
+  # will publish. For Next.js, Netlify's build system handles this,
+  # typically using the .next directory.
+  # If you were doing a static export (next export), you'd set this to "out".
+  # But for standard Next.js with SSR/ISR, let Netlify's plugin handle it,
+  # or specify ".next" if you want to be explicit for some reason, though often not needed.
+  # Netlify automatically detects Next.js projects and uses the correct plugin.
+  # publish = ".next" # Usually not needed as Netlify's Next.js plugin handles this.
+                      # We'll omit it to rely on Netlify's default Next.js behavior.
+
+[functions]
+  # Directory for serverless functions, if you have any separate from Next.js API routes.
+  # For Next.js API routes, Netlify handles them automatically.
+  # directory = "netlify/functions"
+
+# If using Next.js App Router (which this project does),
+# Netlify's Next.js Runtime (v5+) is typically used and handles this well.
+# The Essential Next.js Build Plugin is often automatically applied.
+
+# You can specify the Node.js version if needed, e.g.:
+# [build.environment]
+#   NODE_VERSION = "18" # or your desired version
+
+# For advanced Next.js features on Netlify, you might explore specific plugin configurations,
+# but for a standard setup, this simple toml or even no toml often works.
