@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import WeeklyBookingCalendar from '@/components/reservations/WeeklyBookingCalendar';
-import type { Device, Reservation } from '@/types';
+import type { Device, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +23,7 @@ export default function BookDeviceWeeklyPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
+  const [calendarKey, setCalendarKey] = useState(Date.now()); // Used to force re-render/reset of child
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -58,7 +59,7 @@ export default function BookDeviceWeeklyPage() {
     endTime: Date;
     devicePurposes?: string[];
     notes?: string;
-    bookedQuantity?: number; // Added
+    bookedQuantity?: number;
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
@@ -77,7 +78,7 @@ export default function BookDeviceWeeklyPage() {
       status: 'approved',
       devicePurposes: bookingDetails.devicePurposes,
       notes: bookingDetails.notes,
-      bookedQuantity: bookingDetails.bookedQuantity || 1, // Use provided or default to 1
+      bookedQuantity: bookingDetails.bookedQuantity || 1,
       bookedBy: user.displayName || user.email || "User",
     };
 
@@ -105,9 +106,11 @@ export default function BookDeviceWeeklyPage() {
     setIsProcessingGlobal(true);
     try {
       await updateReservation(reservationId, newDetails);
-      setReservations(prev =>
-        prev.map(res => res.id === reservationId ? { ...res, ...newDetails } : res)
+      // Refetch or update locally for better UX
+      const updatedReservations = reservations.map(res => 
+        res.id === reservationId ? { ...res, ...newDetails, bookedQuantity: newDetails.bookedQuantity || res.bookedQuantity } : res
       );
+      setReservations(updatedReservations);
       toast({
         title: 'Booking Updated!',
         description: `Booking details have been updated.`,
@@ -121,7 +124,7 @@ export default function BookDeviceWeeklyPage() {
     }
   };
 
-  const handleDeleteSlot = (reservationId: string) => {
+  const handleDeleteSlotRequest = (reservationId: string) => {
     setReservationToDelete(reservationId);
     setShowDeleteConfirm(true);
   };
@@ -142,6 +145,68 @@ export default function BookDeviceWeeklyPage() {
       setReservationToDelete(null);
     }
   };
+
+  const handleConfirmMultiBookDevice = async (details: {
+    itemId: string;
+    itemName: string;
+    slots: { day: Date; period: TimePeriod }[];
+    quantity: number;
+    devicePurposes: string[];
+    notes: string;
+  }) => {
+    if (!user) {
+      toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
+      throw new Error("User not logged in");
+    }
+    setIsProcessingGlobal(true);
+    let successCount = 0;
+    let failCount = 0;
+    const newBookings: Reservation[] = [];
+
+    for (const slot of details.slots) {
+      const startTime = setMilliseconds(setSeconds(setMinutes(setHours(slot.day, parseInt(slot.period.start.split(':')[0])), parseInt(slot.period.start.split(':')[1])),0),0);
+      const endTime = setMilliseconds(setSeconds(setMinutes(setHours(slot.day, parseInt(slot.period.end.split(':')[0])), parseInt(slot.period.end.split(':')[1])),0),0);
+      
+      const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: user.uid,
+        userName: user.displayName || user.email || "User",
+        userEmail: user.email || undefined,
+        itemId: details.itemId,
+        itemName: details.itemName,
+        itemType: 'device',
+        startTime,
+        endTime,
+        status: 'approved',
+        devicePurposes: details.devicePurposes,
+        notes: details.notes,
+        bookedQuantity: details.quantity,
+        bookedBy: user.displayName || user.email || "User",
+      };
+      try {
+        const addedReservation = await addReservation(newReservationData);
+        newBookings.push(addedReservation);
+        successCount++;
+      } catch (error) {
+        console.error(`Error booking slot ${format(startTime, "MMM d, HH:mm")}:`, error);
+        failCount++;
+      }
+    }
+    
+    setReservations(prev => [...prev, ...newBookings]);
+
+    if (successCount > 0) {
+      toast({
+        title: "Multi-Booking Processed",
+        description: `${successCount} period(s) for ${details.itemName} booked successfully. ${failCount > 0 ? `${failCount} failed.` : ''}`,
+      });
+    } else if (failCount > 0) {
+       toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed. Please try again.`, variant: "destructive" });
+    }
+    
+    setCalendarKey(Date.now()); // Force re-render to reset multi-select mode in child
+    setIsProcessingGlobal(false);
+  };
+
 
   if (authLoading || isLoading) {
      return (
@@ -166,12 +231,14 @@ export default function BookDeviceWeeklyPage() {
         </p>
       ) : (
         <WeeklyBookingCalendar
+          key={calendarKey} // To allow resetting child state
           items={devices}
           itemType="device"
           reservations={reservations}
-          onBookSlot={handleBookSlot as any}
-          onUpdateSlot={handleUpdateSlot as any}
-          onDeleteSlot={handleDeleteSlot}
+          onBookSlot={handleBookSlot}
+          onUpdateSlot={handleUpdateSlot}
+          onDeleteSlot={handleDeleteSlotRequest}
+          onConfirmMultiBook={handleConfirmMultiBookDevice}
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
           itemDisplayName="Device"
@@ -198,3 +265,5 @@ export default function BookDeviceWeeklyPage() {
     </div>
   );
 }
+
+    
