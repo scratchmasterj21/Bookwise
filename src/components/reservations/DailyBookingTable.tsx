@@ -364,7 +364,7 @@ export default function DailyBookingTable({
   const getCellClasses = (item: Item, period: TimePeriod) => {
     const cellData = getCellDisplayData(item, period);
     const itemStyling = getItemStyling(item, itemType);
-    let baseClasses = "p-0 border align-top h-[70px] relative text-xs group/cell";
+    let baseClasses = "p-0 border align-top relative text-xs group/cell";
 
     if (cellData.isPast) {
         if (cellData.status === 'past-booked') {
@@ -608,7 +608,7 @@ export default function DailyBookingTable({
             <tbody>
               {items.map(item => (
                 <tr key={item.id} className="even:bg-background odd:bg-muted/20">
-                  <td className="p-2 border-r text-center sticky left-0 z-10 align-middle h-[70px] even:bg-background odd:bg-muted/20 font-medium min-w-[250px] whitespace-nowrap">
+                  <td className="p-2 border-r text-center sticky left-0 z-10 align-middle even:bg-background odd:bg-muted/20 font-medium min-w-[250px] whitespace-nowrap">
                      <div className="flex items-center justify-center gap-2">
                         {getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name) &&
                            React.createElement(getIconForItemType(itemType, itemType === 'device' ? (item as Device).type : item.name)!, { className: "h-5 w-5 text-primary"})}
@@ -637,7 +637,7 @@ export default function DailyBookingTable({
                         onMouseEnter={() => setHoveredSlot(slotKey)}
                         onMouseLeave={() => setHoveredSlot(null)}
                       >
-                        <div className="h-full w-full flex flex-col relative p-1.5 text-left overflow-y-auto">
+                        <div className="h-full w-full flex flex-col relative p-1.5 text-left">
                            {isMultiPeriodMode && isSlotBookableForMultiSelect && (
                               <div className="absolute top-1 left-1 z-10">
                                 <Checkbox
@@ -663,18 +663,16 @@ export default function DailyBookingTable({
                                 <span className={cn("block font-semibold text-sm", itemStyling.textClass)}>
                                   {cellData.bookingEntries[0].itemName}
                                 </span>
-                                <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
-                                  <ul className="space-y-0.5">
-                                    {cellData.bookingEntries.map(entry => (
-                                      <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
-                                        {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
-                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </ScrollArea>
+                                <ul className="space-y-0.5">
+                                  {cellData.bookingEntries.map(entry => (
+                                    <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
+                                      {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
+                                      {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                      {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                      {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
+                                    </li>
+                                  ))}
+                                </ul>
                                 {itemType === 'device' && !cellData.isPast && (
                                     <div className="mt-auto pt-0.5 text-[10px]">
                                         {cellData.availableQuantity !== undefined && cellData.availableQuantity > 0 && <span className="text-green-600 font-medium">({cellData.availableQuantity} remaining)</span>}

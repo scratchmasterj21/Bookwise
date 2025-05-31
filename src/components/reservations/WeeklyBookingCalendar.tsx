@@ -456,7 +456,7 @@ export default function WeeklyBookingCalendar({
 
   const getCellClasses = (day: Date, period: TimePeriod) => {
     const cellData = getCellDisplayData(day, period);
-    let baseClasses = "p-0 border align-top h-[75px] relative group/cell"; 
+    let baseClasses = "p-0 border align-top relative group/cell"; 
 
     if (isToday(day) && cellData.status !== 'past-available' && cellData.status !== 'past-booked' && cellData.status !== 'past-booked-all-view') {
         baseClasses = cn(baseClasses, "bg-primary/5"); 
@@ -777,7 +777,7 @@ export default function WeeklyBookingCalendar({
               <tbody>
                 {periods.map(period => (
                   <tr key={period.name} className="even:bg-background odd:bg-muted/20">
-                    <td className="p-2 border-r text-center sticky left-0 z-10 align-middle h-[75px] even:bg-background odd:bg-muted/20 min-w-[120px] sm:min-w-[150px]">
+                    <td className="p-2 border-r text-center sticky left-0 z-10 align-middle even:bg-background odd:bg-muted/20 min-w-[120px] sm:min-w-[150px]">
                        <div className="text-sm font-semibold text-foreground">{period.name}</div>
                        <div className="text-xs text-muted-foreground mt-0.5">{period.label}</div>
                     </td>
@@ -828,18 +828,16 @@ export default function WeeklyBookingCalendar({
                                   <span className={cn("block font-semibold text-sm", currentItemStyling.textClass)}>
                                     {cellData.bookingEntries[0].itemName}
                                   </span>
-                                  <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
-                                    <ul className="space-y-0.5">
-                                      {cellData.bookingEntries.map(entry => (
-                                        <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
-                                          {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                          {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
-                                          {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                          {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </ScrollArea>
+                                  <ul className="space-y-0.5">
+                                    {cellData.bookingEntries.map(entry => (
+                                      <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
+                                        {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
+                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
+                                      </li>
+                                    ))}
+                                  </ul>
                                    {!cellData.isPast && itemType === 'device' && (
                                       <div className="mt-auto pt-0.5 text-[10px]">
                                           {cellData.availableQuantity !== undefined && cellData.availableQuantity > 0 && <span className="text-green-600 font-medium">({cellData.availableQuantity} remaining)</span>}
