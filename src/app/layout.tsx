@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -25,7 +26,7 @@ export default function RootLayout({
       <body className="font-body antialiased min-h-screen flex flex-col">
         <AppProviders>
           <Navbar />
-          <main className="flex-grow container mx-auto px-4 py-8">
+          <main className="flex-grow max-w-screen-2xl mx-auto px-4 py-8 w-full">
             {children}
           </main>
           <Toaster />
