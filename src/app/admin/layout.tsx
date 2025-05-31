@@ -27,7 +27,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </h1>
         </div>
         <Tabs value={activeTabValue} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 md:max-w-xl"> {/* Adjusted for 4 tabs */}
+          <TabsList className="grid w-full grid-cols-4"> {/* Adjusted for 4 tabs & removed max-w-xl */}
             {adminTabs.map((tab) => (
               <TabsTrigger key={tab.href} value={tab.href} asChild>
                 <Link href={tab.href} className="flex items-center gap-2">

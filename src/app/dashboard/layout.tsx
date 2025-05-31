@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="space-y-6 animate-subtle-slide-up">
         <h1 className="text-3xl font-headline font-semibold">User Dashboard</h1>
         <Tabs value={activeTabValue} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 md:max-w-3xl"> {/* Adjusted for 5 tabs */}
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5"> {/* Adjusted for 5 tabs & removed max-w-3xl */}
             {dashboardTabs.map((tab) => (
               <TabsTrigger key={tab.href} value={tab.href} asChild>
                 <Link href={tab.href} className="flex items-center gap-2 text-xs sm:text-sm">
