@@ -265,3 +265,8 @@ export const updateReservationPurpose = async (reservationId: string, purpose: s
 export const cancelReservation = async (reservationId: string): Promise<void> => {
   await updateReservationStatus(reservationId, 'cancelled');
 };
+
+export const deleteReservation = async (reservationId: string): Promise<void> => {
+  const reservationRef = doc(db, 'reservations', reservationId);
+  await deleteDoc(reservationRef);
+};

@@ -8,28 +8,32 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose } from '@/services/firestoreService';
+import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
 import { Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 const TIME_PERIODS: TimePeriod[] = [
   { name: '1st Period', label: '09:00 - 09:45', start: '09:00', end: '09:45' },
   { name: '2nd Period', label: '09:50 - 10:35', start: '09:50', end: '10:35' },
   { name: '3rd Period', label: '10:55 - 11:40', start: '10:55', end: '11:40' },
-  { name: '4th Period (Lower)', label: '11:45 - 12:30', start: '11:45', end: '12:30' },
-  { name: '4th Period (Upper)', label: '12:35 - 13:20', start: '12:35', end: '13:20' },
+  { name: '4th Period (LG)', label: '11:45 - 12:30', start: '11:45', end: '12:30' }, // Updated Label
+  { name: '4th Period (UG)', label: '12:35 - 13:20', start: '12:35', end: '13:20' }, // Updated Label
   { name: '5th Period', label: '13:25 - 14:10', start: '13:25', end: '14:10' },
   { name: '6th Period', label: '14:15 - 15:00', start: '14:15', end: '15:00' },
 ];
 
-export default function BookRoomPage() { // Renamed from BookItemPage
+export default function BookRoomPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false); // Combined booking/updating state
+  const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
+
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -68,7 +72,7 @@ export default function BookRoomPage() { // Renamed from BookItemPage
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
       throw new Error("User not logged in"); 
     }
-    setIsProcessing(true);
+    setIsProcessingGlobal(true);
     const newReservationData: Omit<Reservation, 'id'> = {
       userId: user.uid,
       userName: user.displayName || user.email || "User",
@@ -95,7 +99,7 @@ export default function BookRoomPage() { // Renamed from BookItemPage
        toast({ title: "Booking Failed", description: "Could not create reservation. Please try again.", variant: "destructive"});
        throw error; 
     } finally {
-        setIsProcessing(false);
+        setIsProcessingGlobal(false);
     }
   };
 
@@ -104,7 +108,7 @@ export default function BookRoomPage() { // Renamed from BookItemPage
       toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
       throw new Error("User not logged in");
     }
-    setIsProcessing(true);
+    setIsProcessingGlobal(true);
     try {
       await updateReservationPurpose(reservationId, newPurpose);
       setReservations(prev => 
@@ -119,14 +123,36 @@ export default function BookRoomPage() { // Renamed from BookItemPage
       toast({ title: "Update Failed", description: "Could not update booking. Please try again.", variant: "destructive"});
       throw error;
     } finally {
-      setIsProcessing(false);
+      setIsProcessingGlobal(false);
+    }
+  };
+
+  const handleDeleteSlot = (reservationId: string) => {
+    setReservationToDelete(reservationId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!reservationToDelete) return;
+    setIsProcessingGlobal(true);
+    try {
+      await deleteReservationFromDB(reservationToDelete);
+      setReservations(prev => prev.filter(res => res.id !== reservationToDelete));
+      toast({ title: "Booking Deleted", description: "The reservation has been successfully deleted.", variant: "destructive" });
+    } catch (error) {
+      console.error("Error deleting reservation:", error);
+      toast({ title: "Delete Failed", description: "Could not delete booking. Please try again.", variant: "destructive"});
+    } finally {
+      setIsProcessingGlobal(false);
+      setShowDeleteConfirm(false);
+      setReservationToDelete(null);
     }
   };
   
   if (authLoading || isLoading) {
      return (
         <div className="space-y-4">
-          <Skeleton className="h-10 w-1/3 mb-4" /> {/* Adjusted for new title */}
+          <Skeleton className="h-10 w-1/3 mb-4" />
           <Skeleton className="h-12 w-1/3 mb-2" />
           <Skeleton className="h-[500px] w-full" />
         </div>
@@ -137,7 +163,7 @@ export default function BookRoomPage() { // Renamed from BookItemPage
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
-        {isProcessing && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+        {isProcessingGlobal && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
       </div>
       
       {(!isLoading && rooms.length === 0) ? (
@@ -150,10 +176,28 @@ export default function BookRoomPage() { // Renamed from BookItemPage
           reservations={reservations}
           onBookSlot={handleBookSlot}
           onUpdateSlot={handleUpdateSlot}
+          onDeleteSlot={handleDeleteSlot}
           periods={TIME_PERIODS}
-          isProcessingGlobal={isProcessing}
+          isProcessingGlobal={isProcessingGlobal}
         />
       )}
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the booking.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteConfirm(false)} disabled={isProcessingGlobal}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isProcessingGlobal}>
+              {isProcessingGlobal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
