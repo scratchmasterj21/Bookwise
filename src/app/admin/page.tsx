@@ -1,50 +1,67 @@
+
 "use client";
 
 import ReservationsTable from '@/components/reservations/ReservationsTable';
 import type { Reservation } from '@/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, addHours, subDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getReservations as fetchAllReservationsFromDB, updateReservationStatus } from '@/services/firestoreService';
+import { Loader2 } from 'lucide-react';
 
-// Mock Data - expanded for admin view
-const generateMockAdminReservations = (): Reservation[] => [
-  { id: 'res10', userId: 'userX', userName: 'Alice Wonderland', userEmail: 'alice@example.com', itemId: 'laptop3', itemName: 'Surface Laptop', itemType: 'device', startTime: addDays(new Date(), 2), endTime: addHours(addDays(new Date(), 2), 4), status: 'pending' },
-  { id: 'res11', userId: 'userY', userName: 'Bob The Builder', userEmail: 'bob@example.com', itemId: 'roomD', itemName: 'Main Auditorium', itemType: 'room', startTime: addDays(new Date(), 3), endTime: addHours(addDays(new Date(), 3), 2), status: 'pending' },
-  { id: 'res12', userId: 'userZ', userName: 'Charlie Brown', userEmail: 'charlie@example.com', itemId: 'projector2', itemName: 'Optoma UHD50X', itemType: 'device', startTime: subDays(new Date(),1), endTime: addHours(subDays(new Date(),1), 1), status: 'approved' },
-  { id: 'res13', userId: 'userA', userName: 'Diana Prince', userEmail: 'diana@example.com', itemId: 'roomE', itemName: 'Quiet Study E', itemType: 'room', startTime: subDays(new Date(),5), endTime: addHours(subDays(new Date(),5), 3), status: 'completed' },
-];
 
 export default function ManageReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Simulate API call
+  const fetchAllReservations = useCallback(async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setReservations(generateMockAdminReservations());
+    try {
+      const fetchedReservations = await fetchAllReservationsFromDB(); 
+      // Show pending first, then approved/active, then others
+      const sortedReservations = fetchedReservations.sort((a, b) => {
+        const statusOrder = { pending: 0, approved: 1, active: 1, completed: 2, rejected: 3, cancelled: 4 };
+        return statusOrder[a.status] - statusOrder[b.status] || new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+      });
+      setReservations(sortedReservations); 
+    } catch (error) {
+      console.error("Error fetching all reservations:", error);
+      toast({ title: "Error", description: "Could not fetch reservations.", variant: "destructive" });
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  }, [toast]);
 
-  const handleApproval = (reservationId: string, approved: boolean) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setReservations(prev => 
-        prev.map(r => r.id === reservationId ? {...r, status: approved ? 'approved' : 'rejected'} : r)
-          .filter(r => !(r.id === reservationId && !approved)) // Optionally remove rejected from view or keep to show status
-      );
+  useEffect(() => {
+    fetchAllReservations();
+  }, [fetchAllReservations]);
+
+  const handleApproval = async (reservationId: string, approved: boolean) => {
+    setIsProcessing(true);
+    try {
+      const newStatus = approved ? 'approved' : 'rejected';
+      await updateReservationStatus(reservationId, newStatus);
       toast({
         title: `Reservation ${approved ? 'Approved' : 'Rejected'}`,
         description: `Reservation ID ${reservationId} has been updated.`,
       });
-      setIsLoading(false);
-    }, 500);
+      // Optimistically update UI or refetch
+      setReservations(prev => 
+        prev.map(r => r.id === reservationId ? {...r, status: newStatus} : r)
+          .filter(r => !(newStatus === 'rejected' && r.id === reservationId)) // Optionally remove rejected ones immediately
+      );
+      // Or simply refetch: fetchAllReservations();
+    } catch (error) {
+      console.error("Error updating reservation status:", error);
+      toast({ title: "Error", description: "Could not update reservation status.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  if (isLoading) {
+  if (isLoading && reservations.length === 0) {
     return (
       <div>
         <Skeleton className="h-8 w-1/3 mb-4" />
@@ -55,7 +72,11 @@ export default function ManageReservationsPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-semibold font-headline">Manage All Reservations</h2>
+       <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold font-headline">Manage All Reservations</h2>
+        {(isLoading || isProcessing) && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+      </div>
+      {!isLoading && reservations.length === 0 && <p className="text-center text-muted-foreground mt-4">No reservations found.</p>}
       <ReservationsTable 
         reservations={reservations} 
         isAdminView={true}

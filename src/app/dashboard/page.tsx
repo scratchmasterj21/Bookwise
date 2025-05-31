@@ -1,49 +1,62 @@
+
 "use client";
 
 import ReservationsTable from '@/components/reservations/ReservationsTable';
 import { useAuth } from '@/hooks/useAuth';
 import type { Reservation } from '@/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { addHours, subDays, addDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getReservations as fetchUserReservations, cancelReservation as cancelUserReservationFirestore } from '@/services/firestoreService';
+import { Loader2 } from 'lucide-react';
 
-// Mock Data
-const generateMockReservations = (userId: string): Reservation[] => [
-  { id: 'res1', userId, itemId: 'laptop1', itemName: 'Dell XPS 15', itemType: 'device', startTime: subDays(new Date(), 2), endTime: addHours(subDays(new Date(), 2), 2), status: 'completed', userName: 'Test User' },
-  { id: 'res2', userId, itemId: 'roomA', itemName: 'Conference Room A', itemType: 'room', startTime: addDays(new Date(), 1), endTime: addHours(addDays(new Date(), 1), 3), status: 'approved', userName: 'Test User' },
-  { id: 'res3', userId, itemId: 'tablet1', itemName: 'iPad Pro', itemType: 'device', startTime: addDays(new Date(), 5), endTime: addHours(addDays(new Date(), 5), 1), status: 'pending', userName: 'Test User' },
-];
 
 export default function MyReservationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  const loadUserReservations = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const fetchedReservations = await fetchUserReservations(user.uid);
+      // Filter out cancelled reservations from initial display, unless you want to show them
+      setReservations(fetchedReservations.filter(r => r.status !== 'cancelled' && r.status !== 'rejected' && r.status !== 'completed'));
+    } catch (error) {
+      console.error("Error fetching user reservations:", error);
+      toast({ title: "Error", description: "Could not fetch your reservations.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
     if (user) {
-      // Simulate API call
-      setTimeout(() => {
-        setReservations(generateMockReservations(user.uid));
-        setIsLoading(false);
-      }, 1000);
-    } else if (!authLoading) {
-      setIsLoading(false); // Not logged in, no reservations to load
+      loadUserReservations();
+    } else if (!authLoading) { 
+      setReservations([]); 
+      setIsLoading(false);
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, loadUserReservations]);
 
-  const handleCancelReservation = (reservationId: string) => {
-    // Simulate API call
-    setIsLoading(true);
-    setTimeout(() => {
-      setReservations(prev => prev.map(r => r.id === reservationId ? {...r, status: 'cancelled'} : r));
+  const handleCancelReservation = async (reservationId: string) => {
+    setIsProcessing(true);
+    try {
+      await cancelUserReservationFirestore(reservationId);
       toast({
         title: "Reservation Cancelled",
         description: `Reservation ID ${reservationId} has been cancelled.`,
       });
-      setIsLoading(false);
-    }, 500);
+      setReservations(prev => prev.filter(r => r.id !== reservationId));
+    } catch (error) {
+      console.error("Error cancelling reservation:", error);
+      toast({ title: "Error", description: "Could not cancel reservation.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (authLoading || (isLoading && user)) {
@@ -57,7 +70,10 @@ export default function MyReservationsPage() {
   
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-semibold font-headline">My Reservations</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold font-headline">My Reservations</h2>
+        {isProcessing && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+      </div>
       <ReservationsTable 
         reservations={reservations} 
         onCancel={handleCancelReservation}

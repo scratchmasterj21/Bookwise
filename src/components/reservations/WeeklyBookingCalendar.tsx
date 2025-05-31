@@ -1,28 +1,27 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card'; // Removed CardTitle as it's handled in parent
 import type { Room, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import {
   format,
   startOfWeek,
   addDays,
-  isSameDay,
-  parse,
   setHours,
   setMinutes,
   setSeconds,
   setMilliseconds,
-  isWithinInterval,
-  max,
-  min,
 } from 'date-fns';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '../ui/dialog';
+
 
 interface WeeklyBookingCalendarProps {
   rooms: Room[];
@@ -32,10 +31,11 @@ interface WeeklyBookingCalendarProps {
     roomName: string;
     startTime: Date;
     endTime: Date;
-    purpose: string; // Default purpose for new booking
+    purpose: string; 
   }) => Promise<void>;
   periods: TimePeriod[];
   initialDate?: Date;
+  isBookingGlobal?: boolean; // To disable interactions while any booking is processing
 }
 
 export default function WeeklyBookingCalendar({
@@ -44,12 +44,18 @@ export default function WeeklyBookingCalendar({
   onBookSlot,
   periods,
   initialDate = new Date(),
+  isBookingGlobal = false,
 }: WeeklyBookingCalendarProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [currentDate, setCurrentDate] = useState(startOfWeek(initialDate, { weekStartsOn: 1 })); // Monday
+  const [currentDate, setCurrentDate] = useState(startOfWeek(initialDate, { weekStartsOn: 1 })); 
   const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id || '');
-  const [isBooking, setIsBooking] = useState(false);
+  
+  const [isSlotBooking, setIsSlotBooking] = useState(false); // Specific to one slot click
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [currentBookingSlot, setCurrentBookingSlot] = useState<{day: Date, period: TimePeriod} | null>(null);
+  const [bookingPurpose, setBookingPurpose] = useState('');
+
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 5 }).map((_, i) => addDays(currentDate, i));
@@ -73,14 +79,15 @@ export default function WeeklyBookingCalendar({
 
     return reservations.find(res => {
       if (res.itemId !== roomId) return false;
-      // Check for overlap: (ResStart < PeriodEnd) and (ResEnd > PeriodStart)
       const reservationStart = new Date(res.startTime);
       const reservationEnd = new Date(res.endTime);
-      return reservationStart < periodEndDateTime && reservationEnd > periodStartDateTime;
+      return reservationStart < periodEndDateTime && reservationEnd > periodStartDateTime && res.status !== 'cancelled' && res.status !== 'rejected';
     });
   };
   
-  const handleSlotClick = async (day: Date, period: TimePeriod) => {
+  const handleSlotClick = (day: Date, period: TimePeriod) => {
+    if (isBookingGlobal || isSlotBooking) return;
+
     if (!user) {
       toast({ title: "Authentication required", description: "Please log in to book.", variant: "destructive" });
       return;
@@ -92,15 +99,25 @@ export default function WeeklyBookingCalendar({
 
     const booking = getSlotBooking(day, period, selectedRoomId);
     if (booking) {
-      toast({ title: "Slot Booked", description: "This slot is already booked.", variant: "destructive" });
+      toast({ title: "Slot Booked", description: `This slot is already booked by ${booking.bookedBy} for: ${booking.purpose}.`, variant: "default" });
       return;
     }
+    
+    setCurrentBookingSlot({day, period});
+    setBookingPurpose(user.displayName ? `${user.displayName}'s Class/Booking` : "Class/Booking");
+    setBookingModalOpen(true);
+  };
 
-    setIsBooking(true);
+  const confirmBooking = async () => {
+    if (!currentBookingSlot || !user || !selectedRoomId) return;
+    
+    setIsSlotBooking(true); // Indicate this specific slot action is processing
+    const {day, period} = currentBookingSlot;
     const selectedRoom = rooms.find(r => r.id === selectedRoomId);
     if (!selectedRoom) {
         toast({title: "Error", description: "Selected room not found.", variant: "destructive"})
-        setIsBooking(false);
+        setIsSlotBooking(false);
+        setBookingModalOpen(false);
         return;
     }
 
@@ -108,100 +125,140 @@ export default function WeeklyBookingCalendar({
     const endTime = setMilliseconds(setSeconds(setMinutes(setHours(day, parseInt(period.end.split(':')[0])), parseInt(period.end.split(':')[1])),0),0);
 
     try {
-      // For demo, we'll use a generic purpose or prompt user later
-      await onBookSlot({ roomId: selectedRoomId, roomName: selectedRoom.name, startTime, endTime, purpose: `${user.displayName}'s Booking` });
+      await onBookSlot({ roomId: selectedRoomId, roomName: selectedRoom.name, startTime, endTime, purpose: bookingPurpose });
     } catch (error) {
-      // Error toast is handled by onBookSlot
+      // Error toast is handled by onBookSlot's catch block in the parent
     } finally {
-      setIsBooking(false);
+      setIsSlotBooking(false);
+      setBookingModalOpen(false);
+      setCurrentBookingSlot(null);
+      setBookingPurpose('');
     }
-  };
+  }
 
 
-  const selectedRoomName = rooms.find(r => r.id === selectedRoomId)?.name || "All Rooms";
+  const selectedRoomName = rooms.find(r => r.id === selectedRoomId)?.name || "Select Room";
 
 
   return (
     <Card className="shadow-lg w-full animate-subtle-fade-in">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-4">
-          <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
-            <SelectTrigger className="w-[250px]">
+      <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-2 md:space-y-0 pb-2">
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <Select value={selectedRoomId} onValueChange={setSelectedRoomId} disabled={isBookingGlobal || isSlotBooking}>
+            <SelectTrigger className="w-full md:w-[250px]">
               <SelectValue placeholder="Select a Room" />
             </SelectTrigger>
             <SelectContent>
-              {/* <SelectItem value="all">All Rooms</SelectItem> */}
               {rooms.map(room => (
-                <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>
+                <SelectItem key={room.id} value={room.id}>{room.name} ({room.buildingName})</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-medium">
-            Week of {format(currentDate, 'MMM dd, yyyy')}
+        <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-end">
+          <h3 className="text-lg font-medium text-center md:text-left">
+            Week: {format(currentDate, 'MMM dd')} - {format(addDays(currentDate, 4), 'MMM dd, yyyy')}
           </h3>
-          <Button variant="outline" size="icon" onClick={handlePrevWeek} disabled={isBooking}>
+          <Button variant="outline" size="icon" onClick={handlePrevWeek} disabled={isBookingGlobal || isSlotBooking}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={handleToday} disabled={isBooking}>Today</Button>
-          <Button variant="outline" size="icon" onClick={handleNextWeek} disabled={isBooking}>
+          <Button variant="outline" onClick={handleToday} disabled={isBookingGlobal || isSlotBooking}>Today</Button>
+          <Button variant="outline" size="icon" onClick={handleNextWeek} disabled={isBookingGlobal || isSlotBooking}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-muted">
-                <th className="p-2 border text-left w-1/6">Period</th>
-                {weekDays.map(day => (
-                  <th key={day.toISOString()} className="p-2 border text-center">
-                    {format(day, 'EEE')} <br /> {format(day, 'MMM dd')}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {periods.map(period => (
-                <tr key={period.name}>
-                  <td className="p-2 border text-left">
-                    <div className="font-semibold">{period.name}</div>
-                    <div className="text-xs text-muted-foreground">{period.label}</div>
-                  </td>
-                  {weekDays.map(day => {
-                    const booking = selectedRoomId !== 'all' ? getSlotBooking(day, period, selectedRoomId) : undefined;
-                    const isSlotDisabled = isBooking || (booking && booking.userId !== user?.uid && booking?.status !== 'cancelled');
-
-                    return (
-                      <td
-                        key={day.toISOString() + period.name}
-                        className={`p-1 border align-top h-24 ${
-                          booking ? (booking.bookedBy === 'Limpiada' ? 'bg-green-100' : 'bg-blue-100') : 'hover:bg-accent/50 cursor-pointer'
-                        }`}
-                        onClick={() => !booking && handleSlotClick(day, period)}
-                      >
-                        {booking ? (
-                          <div className={`p-1 rounded-md text-xs ${booking.bookedBy === 'Limpiada' ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50'} border`}>
-                            <div className="font-semibold">{booking.itemName || selectedRoomName}</div>
-                            {booking.bookedBy && <div className="text-primary">{booking.bookedBy}</div>}
-                            <div>{booking.purpose}</div>
-                          </div>
-                        ) : (
-                          <div className="text-center text-muted-foreground text-xs p-2">Available</div>
-                        )}
-                      </td>
-                    );
-                  })}
+        {selectedRoomId ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="p-2 border text-left w-1/6 sticky left-0 bg-muted z-10">Period</th>
+                  {weekDays.map(day => (
+                    <th key={day.toISOString()} className="p-2 border text-center min-w-[120px]">
+                      {format(day, 'EEE')} <br /> {format(day, 'MMM dd')}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-         {isBooking && <p className="text-center mt-4 text-primary">Processing booking...</p>}
+              </thead>
+              <tbody>
+                {periods.map(period => (
+                  <tr key={period.name}>
+                    <td className="p-2 border text-left sticky left-0 bg-card z-10">
+                      <div className="font-semibold">{period.name}</div>
+                      <div className="text-xs text-muted-foreground">{period.label}</div>
+                    </td>
+                    {weekDays.map(day => {
+                      const booking = getSlotBooking(day, period, selectedRoomId);
+                      const cellDisabled = isBookingGlobal || isSlotBooking;
+
+                      return (
+                        <td
+                          key={day.toISOString() + period.name}
+                          className={`p-1 border align-top h-24 relative ${
+                            booking ? (booking.bookedBy === 'Limpiada' ? 'bg-green-50' : 'bg-blue-50') 
+                                    : (cellDisabled ? 'bg-muted/30' : 'hover:bg-accent/30 cursor-pointer')
+                          } ${cellDisabled && !booking ? 'cursor-not-allowed' : ''}`}
+                          onClick={() => !booking && !cellDisabled && handleSlotClick(day, period)}
+                        >
+                          {booking ? (
+                            <div className={`p-1.5 rounded-md text-xs ${booking.bookedBy === 'Limpiada' ? 'border-green-400 bg-green-100 text-green-800' : 'border-blue-400 bg-blue-100 text-blue-800'} border`}>
+                              <div className="font-semibold truncate">{booking.itemName || selectedRoomName}</div>
+                              {booking.bookedBy && <div className="text-primary truncate">{booking.bookedBy}</div>}
+                              <div className="truncate">{booking.purpose}</div>
+                            </div>
+                          ) : (
+                            <div className="text-center text-muted-foreground text-xs p-2 flex items-center justify-center h-full">
+                              {cellDisabled ? "Checking..." : "Available"}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground py-10">Please select a room to view its schedule.</p>
+        )}
       </CardContent>
+
+      <Dialog open={bookingModalOpen} onOpenChange={setBookingModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Book Slot</DialogTitle>
+          </DialogHeader>
+          {currentBookingSlot && (
+            <div className="space-y-4 py-2">
+              <p><strong>Room:</strong> {rooms.find(r=>r.id === selectedRoomId)?.name}</p>
+              <p><strong>Date:</strong> {format(currentBookingSlot.day, 'EEEE, MMM dd, yyyy')}</p>
+              <p><strong>Period:</strong> {currentBookingSlot.period.name} ({currentBookingSlot.period.label})</p>
+              <div>
+                <Label htmlFor="booking-purpose">Purpose/Class:</Label>
+                <Input 
+                  id="booking-purpose" 
+                  value={bookingPurpose} 
+                  onChange={(e) => setBookingPurpose(e.target.value)}
+                  placeholder="e.g., G5 Math Class"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={isSlotBooking}>Cancel</Button>
+            </DialogClose>
+            <Button onClick={confirmBooking} disabled={isSlotBooking || !bookingPurpose.trim()}>
+              {isSlotBooking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Booking
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </Card>
   );
 }
-

@@ -5,11 +5,11 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, googleProvider } from '@/lib/firebase';
+import { auth, googleProvider, db } from '@/lib/firebase'; // Added db
 import type { User } from '@/types';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Firebase SDK imports
 
-// Hardcoded admin UID for demo purposes
-const ADMIN_UID = process.env.NEXT_PUBLIC_ADMIN_UID || "YOUR_ADMIN_USER_UID"; 
+const ADMIN_UID = process.env.NEXT_PUBLIC_ADMIN_UID || "YOUR_ADMIN_USER_UID_REPLACE_ME"; 
 
 interface AuthContextType {
   user: User | null;
@@ -28,17 +28,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        const appUser: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-          isAdmin: firebaseUser.uid === ADMIN_UID, // Check if user is admin
-        };
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        let appUser: User;
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          appUser = {
+            ...userData,
+            uid: firebaseUser.uid, // ensure uid is present
+            // Convert Firestore Timestamps to JS Dates if necessary, e.g., for createdAt
+            createdAt: userData.createdAt instanceof Timestamp ? userData.createdAt.toDate() : userData.createdAt,
+          } as User;
+          
+          if (typeof appUser.isAdmin === 'undefined') {
+            appUser.isAdmin = firebaseUser.uid === ADMIN_UID;
+            // await setDoc(userRef, { isAdmin: appUser.isAdmin }, { merge: true }); // Potentially update if missing
+          }
+        } else {
+          // New user, create profile in Firestore
+          const initialIsAdmin = firebaseUser.uid === ADMIN_UID;
+          appUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL: firebaseUser.photoURL,
+            isAdmin: initialIsAdmin,
+            createdAt: new Date(), // Use JS Date, Firestore will convert to Timestamp
+          };
+          await setDoc(userRef, {
+            ...appUser,
+            createdAt: serverTimestamp() // Use serverTimestamp for consistent creation time
+          });
+          appUser.createdAt = new Date(); // For local state consistency immediately
+        }
+        
         setUser(appUser);
         setIsAdmin(appUser.isAdmin || false);
+
       } else {
         setUser(null);
         setIsAdmin(false);
@@ -53,13 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
-      // Auth state change will be handled by onAuthStateChanged
-      router.push('/dashboard');
+      router.push('/dashboard'); 
     } catch (error) {
       console.error("Error signing in with Google: ", error);
-      // Handle error (e.g., show toast)
-    } finally {
-      // setLoading(false); // onAuthStateChanged will set loading to false
+      setLoading(false); 
     }
   };
 
@@ -70,10 +97,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.push('/login');
     } catch (error) {
       console.error("Error signing out: ", error);
-      // Handle error
-    } finally {
-      // setLoading(false); // onAuthStateChanged will set loading to false
-    }
+    } 
+    // setLoading(false) is handled by onAuthStateChanged
   };
 
   return (

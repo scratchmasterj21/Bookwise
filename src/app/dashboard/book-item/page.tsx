@@ -1,16 +1,17 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import WeeklyBookingCalendar from '@/components/reservations/WeeklyBookingCalendar';
-import type { Room, Reservation, ReservationRequest, TimePeriod } from '@/types';
+import type { Room, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { addDays, addHours, setHours, setMinutes, startOfWeek } from 'date-fns'; // For mock data
 import { format } from 'date-fns';
+import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation } from '@/services/firestoreService';
+import { Loader2 } from 'lucide-react';
 
-// Define periods (could be moved to a config file or fetched)
+
 const TIME_PERIODS: TimePeriod[] = [
   { name: '1st Period', label: '09:00 - 09:45', start: '09:00', end: '09:45' },
   { name: '2nd Period', label: '09:50 - 10:35', start: '09:50', end: '10:35' },
@@ -21,137 +22,40 @@ const TIME_PERIODS: TimePeriod[] = [
   { name: '6th Period', label: '14:15 - 15:00', start: '14:15', end: '15:00' },
 ];
 
-const createTime = (date: Date, timeStr: string): Date => {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return setMinutes(setHours(date, hours), minutes);
-};
-
-const today = new Date();
-const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
-const tuesdayThisWeek = addDays(mondayThisWeek, 1);
-const wednesdayThisWeek = addDays(mondayThisWeek, 2);
-const thursdayThisWeek = addDays(mondayThisWeek, 3);
-const fridayThisWeek = addDays(mondayThisWeek, 4);
-
-
-const mockRooms: Room[] = [
-  { id: 'compRoom1', name: 'Computer Room Limpiada', capacity: 20, status: 'available', category: 'Computer Room', imageUrl: 'https://placehold.co/600x400.png', description: 'Main computer lab.' },
-  { id: 'musicRoom1', name: 'Music Room Miyamae', capacity: 15, status: 'available', category: 'Music Room', imageUrl: 'https://placehold.co/600x400.png', description: 'Music practice and recording room.' },
-  { id: 'compRoom2', name: 'Computer Room G3B', capacity: 20, status: 'available', category: 'Computer Room', imageUrl: 'https://placehold.co/600x400.png', description: 'Secondary computer lab.' },
-];
-
-const generateInitialMockReservations = (userId: string, userName?: string): Reservation[] => [
-  // Tuesday, 3rd Period, Computer Room Limpiada
-  {
-    id: 'res1', userId: 'teacher1', userName: 'Teacher A', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(tuesdayThisWeek, TIME_PERIODS[2].start), 
-    endTime: createTime(tuesdayThisWeek, TIME_PERIODS[2].end), 
-    status: 'approved', purpose: 'G3B Computer Class', bookedBy: 'Limpiada'
-  },
-  // Monday, 4th Period (Upper), Computer Room Limpiada
-   {
-    id: 'res2', userId: 'teacher2', userName: 'Teacher B', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(mondayThisWeek, TIME_PERIODS[4].start),
-    endTime: createTime(mondayThisWeek, TIME_PERIODS[4].end),
-    status: 'approved', purpose: 'G5B Computer Class (Gunma...)', bookedBy: 'Limpiada'
-  },
-  // Tuesday, 5th Period, Computer Room Limpiada
-  {
-    id: 'res3', userId: 'teacher3', userName: 'Teacher C', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(tuesdayThisWeek, TIME_PERIODS[5].start),
-    endTime: createTime(tuesdayThisWeek, TIME_PERIODS[5].end),
-    status: 'approved', purpose: 'G6B Computer Class', bookedBy: 'Limpiada'
-  },
-    // Wednesday, 5th Period, Computer Room Limpiada
-  {
-    id: 'res4', userId: 'teacher3', userName: 'Teacher C', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(wednesdayThisWeek, TIME_PERIODS[5].start),
-    endTime: createTime(wednesdayThisWeek, TIME_PERIODS[5].end),
-    status: 'approved', purpose: 'G3A Computer Class', bookedBy: 'Limpiada'
-  },
-  // Thursday, 5th Period, Music Room Miyamae
-  {
-    id: 'res5', userId: 'teacher4', userName: 'Teacher D', itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
-    startTime: createTime(thursdayThisWeek, TIME_PERIODS[5].start),
-    endTime: createTime(thursdayThisWeek, TIME_PERIODS[5].end),
-    status: 'approved', purpose: 'G1 Music', bookedBy: 'Miyamae'
-  },
-    // Thursday, 5th Period, Computer Room Limpiada (Concurrent with Music)
-  {
-    id: 'res6', userId: 'teacher2', userName: 'Teacher B', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(thursdayThisWeek, TIME_PERIODS[5].start),
-    endTime: createTime(thursdayThisWeek, TIME_PERIODS[5].end),
-    status: 'approved', purpose: 'G6A Computer Class', bookedBy: 'Limpiada'
-  },
-  // Friday, 5th Period, Music Room Miyamae
-  {
-    id: 'res7', userId: 'teacher4', userName: 'Teacher D', itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
-    startTime: createTime(fridayThisWeek, TIME_PERIODS[5].start),
-    endTime: createTime(fridayThisWeek, TIME_PERIODS[5].end),
-    status: 'approved', purpose: 'G3 Music', bookedBy: 'Miyamae'
-  },
-  // Monday, 6th Period, Music Room Miyamae
-  {
-    id: 'res8', userId: 'teacher1', userName: 'Teacher A',itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
-    startTime: createTime(mondayThisWeek, TIME_PERIODS[6].start),
-    endTime: createTime(mondayThisWeek, TIME_PERIODS[6].end),
-    status: 'approved', purpose: 'G2 Music', bookedBy: 'Miyamae'
-  },
-   // Tuesday, 6th Period, Computer Room Limpiada
-  {
-    id: 'res9', userId: 'teacher2', userName: 'Teacher B', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(tuesdayThisWeek, TIME_PERIODS[6].start),
-    endTime: createTime(tuesdayThisWeek, TIME_PERIODS[6].end),
-    status: 'approved', purpose: 'G4A Computer Class', bookedBy: 'Limpiada'
-  },
-  // Wednesday, 6th Period, Computer Room Limpiada
-  {
-    id: 'res10', userId: 'teacher3', userName: 'Teacher C',itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(wednesdayThisWeek, TIME_PERIODS[6].start),
-    endTime: createTime(wednesdayThisWeek, TIME_PERIODS[6].end),
-    status: 'approved', purpose: 'G5A Computer Class', bookedBy: 'Limpiada'
-  },
-    // Friday, 6th Period, Computer Room Limpiada
-  {
-    id: 'res11', userId: 'teacher1', userName: 'Teacher A',itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
-    startTime: createTime(fridayThisWeek, TIME_PERIODS[6].start),
-    endTime: createTime(fridayThisWeek, TIME_PERIODS[6].end),
-    status: 'approved', purpose: 'G4B Computer Class', bookedBy: 'Limpiada'
-  },
-  // User's own booking for testing
-  {
-    id: 'myres1', userId: userId, userName: userName, itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
-    startTime: createTime(wednesdayThisWeek, TIME_PERIODS[0].start), // Wed, 1st Period
-    endTime: createTime(wednesdayThisWeek, TIME_PERIODS[0].end),
-    status: 'approved', purpose: 'My Practice', bookedBy: userName
-  },
-];
-
-
 export default function BookItemPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
-  const [rooms, setRooms] = useState<Room[]>(mockRooms);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBooking, setIsBooking] = useState(false); // For individual slot booking
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [fetchedRooms, fetchedReservations] = await Promise.all([
+        fetchRoomsFromDB(),
+        fetchReservationsFromDB() 
+      ]);
+      // Filter rooms that are meant for period-based booking, e.g., 'Computer Room' or 'Music Room'
+      setRooms(fetchedRooms.filter(room => room.category === 'Computer Room' || room.category === 'Music Room'));
+      setReservations(fetchedReservations);
+    } catch (error) {
+      console.error("Error fetching data for booking page:", error);
+      toast({ title: "Error", description: "Could not load rooms or reservations.", variant: "destructive" });
+      setRooms([]); // Ensure rooms is empty on error
+      setReservations([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    // Simulate fetching data
-    setIsLoading(true);
-    if (user) {
-        setReservations(generateInitialMockReservations(user.uid, user.displayName || user.email || "User"));
-    } else if (!authLoading) { // If not loading and no user
-        setReservations(generateInitialMockReservations("guest-user", "Guest")); // Show some bookings even for guests
+    if (!authLoading) { 
+        fetchData();
     }
-
-    // If still no user after auth check, and no guest data loaded
-    if (!authLoading && !user && reservations.length === 0) {
-       setReservations(generateInitialMockReservations("guest-user", "Guest"));
-    }
-
-    setIsLoading(false);
-  }, [user, authLoading]);
+  }, [authLoading, fetchData]);
 
   const handleBookSlot = async (bookingDetails: {
     roomId: string;
@@ -162,31 +66,37 @@ export default function BookItemPage() {
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
-      throw new Error("User not logged in");
+      throw new Error("User not logged in"); 
     }
-
-    const newReservation: Reservation = {
-      id: `res-${Date.now()}`,
+    setIsBooking(true);
+    const newReservationData: Omit<Reservation, 'id'> = {
       userId: user.uid,
-      userName: user.displayName || user.email,
+      userName: user.displayName || user.email || "User",
+      userEmail: user.email || undefined,
       itemId: bookingDetails.roomId,
       itemName: bookingDetails.roomName,
-      itemType: 'room', // Currently only rooms for this calendar
+      itemType: 'room', 
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
-      status: 'approved', // Auto-approve for demo
+      status: 'approved', 
       purpose: bookingDetails.purpose,
       bookedBy: user.displayName || user.email || "User",
     };
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 700));
-
-    setReservations(prev => [...prev, newReservation]);
-    toast({
-      title: 'Room Booked!',
-      description: `${bookingDetails.roomName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
-    });
+    try {
+      const addedReservation = await addReservation(newReservationData);
+      setReservations(prev => [...prev, addedReservation]); 
+      toast({
+        title: 'Room Booked!',
+        description: `${bookingDetails.roomName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
+      });
+    } catch (error) {
+       console.error("Error creating reservation:", error);
+       toast({ title: "Booking Failed", description: "Could not create reservation. Please try again.", variant: "destructive"});
+       throw error; 
+    } finally {
+        setIsBooking(false);
+    }
   };
   
   if (authLoading || isLoading) {
@@ -198,16 +108,28 @@ export default function BookItemPage() {
         </div>
     );
   }
-
+  
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
-      <WeeklyBookingCalendar 
-        rooms={rooms}
-        reservations={reservations}
-        onBookSlot={handleBookSlot}
-        periods={TIME_PERIODS}
-      />
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
+        {isBooking && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+      </div>
+      
+      {(!isLoading && rooms.length === 0) ? (
+         <p className="text-muted-foreground text-center mt-6">
+            No rooms (e.g., Computer Room, Music Room) are currently configured for period-based booking.
+            <br /> Please contact an administrator to set them up.
+        </p>
+      ) : (
+        <WeeklyBookingCalendar 
+          rooms={rooms}
+          reservations={reservations}
+          onBookSlot={handleBookSlot}
+          periods={TIME_PERIODS}
+          isBookingGlobal={isBooking}
+        />
+      )}
     </div>
   );
 }
