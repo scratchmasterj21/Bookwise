@@ -3,11 +3,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import DailyBookingTable from '@/components/reservations/DailyBookingTable';
-import type { Room, Reservation } from '@/types';
+import type { Room, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
 import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -28,6 +28,7 @@ export default function DailyBookingsPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
+  const [tableKey, setTableKey] = useState(Date.now()); // Key to reset DailyBookingTable
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -56,8 +57,8 @@ export default function DailyBookingsPage() {
   }, [authLoading, fetchData]);
 
   const handleBookSlot = async (bookingDetails: {
-    roomId: string;
-    roomName: string;
+    itemId: string; // was roomId
+    itemName: string; // was roomName
     startTime: Date;
     endTime: Date;
     purpose: string;
@@ -67,12 +68,12 @@ export default function DailyBookingsPage() {
       throw new Error("User not logged in"); 
     }
     setIsProcessingGlobal(true);
-    const newReservationData: Omit<Reservation, 'id'> = {
+    const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
       userId: user.uid,
       userName: user.displayName || user.email || "User",
       userEmail: user.email || undefined,
-      itemId: bookingDetails.roomId,
-      itemName: bookingDetails.roomName,
+      itemId: bookingDetails.itemId,
+      itemName: bookingDetails.itemName,
       itemType: 'room', 
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
@@ -86,7 +87,7 @@ export default function DailyBookingsPage() {
       setReservations(prev => [...prev, addedReservation]); 
       toast({
         title: 'Room Booked!',
-        description: `${bookingDetails.roomName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
+        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
       });
     } catch (error) {
        console.error("Error creating reservation:", error);
@@ -97,16 +98,19 @@ export default function DailyBookingsPage() {
     }
   };
 
-  const handleUpdateSlot = async (reservationId: string, newPurpose: string) => {
+  const handleUpdateSlot = async (reservationId: string, newDetails: { purpose?: string }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
       throw new Error("User not logged in");
     }
     setIsProcessingGlobal(true);
     try {
-      await updateReservationPurpose(reservationId, newPurpose);
+      if (typeof newDetails.purpose !== 'string') {
+        throw new Error("Purpose must be a string for room bookings.");
+      }
+      await updateReservationPurpose(reservationId, newDetails.purpose);
       setReservations(prev => 
-        prev.map(res => res.id === reservationId ? { ...res, purpose: newPurpose } : res)
+        prev.map(res => res.id === reservationId ? { ...res, purpose: newDetails.purpose } : res)
       );
       toast({
         title: 'Booking Updated!',
@@ -141,6 +145,63 @@ export default function DailyBookingsPage() {
       setShowDeleteConfirm(false);
       setReservationToDelete(null);
     }
+  };
+
+  const handleConfirmMultiBookRoomDaily = async (details: {
+    itemId: string;
+    itemName: string;
+    periods: TimePeriod[];
+    purpose: string;
+  }) => {
+    if (!user) {
+      toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
+      throw new Error("User not logged in");
+    }
+    setIsProcessingGlobal(true);
+    let successCount = 0;
+    let failCount = 0;
+    const newBookings: Reservation[] = [];
+
+    for (const period of details.periods) {
+      const startTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.start.split(':')[0])), parseInt(period.start.split(':')[1])),0),0);
+      const endTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.end.split(':')[0])), parseInt(period.end.split(':')[1])),0),0);
+      
+      const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: user.uid,
+        userName: user.displayName || user.email || "User",
+        userEmail: user.email || undefined,
+        itemId: details.itemId,
+        itemName: details.itemName,
+        itemType: 'room',
+        startTime,
+        endTime,
+        status: 'approved',
+        purpose: details.purpose,
+        bookedBy: user.displayName || user.email || "User",
+      };
+      try {
+        const addedReservation = await addReservation(newReservationData);
+        newBookings.push(addedReservation);
+        successCount++;
+      } catch (error) {
+        console.error(`Error booking room slot ${format(startTime, "MMM d, HH:mm")} for ${details.itemName}:`, error);
+        failCount++;
+      }
+    }
+    
+    setReservations(prev => [...prev, ...newBookings]);
+
+    if (successCount > 0) {
+      toast({
+        title: "Multi-Booking Processed",
+        description: `${successCount} period(s) for ${details.itemName} booked successfully. ${failCount > 0 ? `${failCount} failed.` : ''}`,
+      });
+    } else if (failCount > 0) {
+       toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed for ${details.itemName}. Please try again.`, variant: "destructive" });
+    }
+    
+    setTableKey(Date.now()); 
+    setIsProcessingGlobal(false);
   };
   
   if (authLoading || (isLoading && rooms.length === 0)) {
@@ -196,15 +257,19 @@ export default function DailyBookingsPage() {
          <Skeleton className="h-[500px] w-full" />
       ) : (
         <DailyBookingTable 
+          key={tableKey}
           selectedDate={selectedDate}
           items={rooms}
           itemType="room"
           reservations={reservations}
           onBookSlot={handleBookSlot}
-          onUpdateSlot={handleUpdateSlot}
+          onUpdateSlot={handleUpdateSlot as any} // Cast to allow specific details type
           onDeleteSlot={handleDeleteSlotRequest}
+          onConfirmMultiBookDaily={handleConfirmMultiBookRoomDaily as any} // Cast to allow specific details type
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
+          itemDisplayName="Room"
+          bookingModalPurposeLabel="Purpose of Booking"
         />
       )}
 
@@ -227,3 +292,4 @@ export default function DailyBookingsPage() {
     </div>
   );
 }
+
