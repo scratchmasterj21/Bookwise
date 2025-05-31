@@ -78,7 +78,7 @@ export default function BookItemPage() {
       itemType: 'room', 
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
-      status: 'approved', 
+      status: 'approved', // Period bookings are auto-approved for simplicity, adjust if needed
       purpose: bookingDetails.purpose,
       bookedBy: user.displayName || user.email || "User",
     };
@@ -93,7 +93,7 @@ export default function BookItemPage() {
     } catch (error) {
        console.error("Error creating reservation:", error);
        toast({ title: "Booking Failed", description: "Could not create reservation. Please try again.", variant: "destructive"});
-       throw error; 
+       throw error; // Rethrow to be caught by the calendar component's finally block
     } finally {
         setIsBooking(false);
     }

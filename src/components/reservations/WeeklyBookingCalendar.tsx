@@ -4,7 +4,7 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader } from '@/components/ui/card'; // Removed CardTitle as it's handled in parent
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import type { Room, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -48,7 +48,7 @@ export default function WeeklyBookingCalendar({
 }: WeeklyBookingCalendarProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [currentDate, setCurrentDate] = useState(startOfWeek(initialDate, { weekStartsOn: 1 })); 
+  const [currentDate, setCurrentDate] = useState(startOfWeek(initialDate, { weekStartsOn: 1 })); // Monday
   const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id || '');
   
   const [isSlotBooking, setIsSlotBooking] = useState(false); // Specific to one slot click
@@ -58,7 +58,7 @@ export default function WeeklyBookingCalendar({
 
 
   const weekDays = useMemo(() => {
-    return Array.from({ length: 5 }).map((_, i) => addDays(currentDate, i));
+    return Array.from({ length: 5 }).map((_, i) => addDays(currentDate, i)); // Mon - Fri
   }, [currentDate]);
 
   const handlePrevWeek = () => {
@@ -81,6 +81,7 @@ export default function WeeklyBookingCalendar({
       if (res.itemId !== roomId) return false;
       const reservationStart = new Date(res.startTime);
       const reservationEnd = new Date(res.endTime);
+      // Check for overlap: (StartA < EndB) and (EndA > StartB)
       return reservationStart < periodEndDateTime && reservationEnd > periodStartDateTime && res.status !== 'cancelled' && res.status !== 'rejected';
     });
   };
@@ -197,7 +198,7 @@ export default function WeeklyBookingCalendar({
                         <td
                           key={day.toISOString() + period.name}
                           className={`p-1 border align-top h-24 relative ${
-                            booking ? (booking.bookedBy === 'Limpiada' ? 'bg-green-50' : 'bg-blue-50') 
+                            booking ? (booking.bookedBy === 'Limpiada' ? 'bg-green-50' : 'bg-blue-50') // Example specific style
                                     : (cellDisabled ? 'bg-muted/30' : 'hover:bg-accent/30 cursor-pointer')
                           } ${cellDisabled && !booking ? 'cursor-not-allowed' : ''}`}
                           onClick={() => !booking && !cellDisabled && handleSlotClick(day, period)}

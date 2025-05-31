@@ -30,7 +30,7 @@ export interface Device {
   buildingName?: string;
   roomId?: string;
   roomName?: string;
-  quantity: number; // Added quantity
+  quantity: number;
 }
 
 export interface Room {
@@ -72,6 +72,6 @@ export type ReservationRequest = Omit<Reservation, 'id' | 'userId' | 'userName' 
 export interface TimePeriod {
   name: string;
   label: string;
-  start: string;
-  end: string;
+  start: string; // e.g., "09:00"
+  end: string;   // e.g., "09:45"
 }
