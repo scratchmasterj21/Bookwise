@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers, MapPin, Boxes } from 'lucide-react'; // Added Boxes for quantity
+import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers, MapPin, Boxes } from 'lucide-react';
 import Image from 'next/image';
 import { Badge } from '../ui/badge';
 
@@ -143,26 +143,18 @@ export default function ItemManagementTable({
     // Device
     const d = item as Device;
     return (
-      <TableRow key={d.id}>
-        {commonImageCell}
-        <TableCell className="font-medium">{d.name}</TableCell>
-        <TableCell>{d.type}</TableCell>
-        <TableCell>{d.quantity}</TableCell> {/* Display quantity */}
-        <TableCell>{`${d.buildingName || 'N/A'} / ${d.roomName || 'N/A'}`}</TableCell>
-        <TableCell>
+      <TableRow key={d.id}>{commonImageCell}<TableCell className="font-medium">{d.name}</TableCell><TableCell>{d.type}</TableCell><TableCell>{d.quantity}</TableCell><TableCell>{`${d.buildingName || 'N/A'} / ${d.roomName || 'N/A'}`}</TableCell><TableCell>
           <Badge variant={d.status === 'available' ? 'default' : d.status === 'booked' ? 'secondary' : 'destructive'} className="capitalize">
             {d.status}
           </Badge>
-        </TableCell>
-        <TableCell className="text-right space-x-1">
+        </TableCell><TableCell className="text-right space-x-1">
           <Button variant="ghost" size="icon" onClick={() => onEdit(d)} className="hover:text-primary">
             <Edit3 className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => onDelete(d.id)} className="hover:text-destructive">
             <Trash2 className="h-4 w-4" />
           </Button>
-        </TableCell>
-      </TableRow>
+        </TableCell></TableRow>
     );
   };
 
