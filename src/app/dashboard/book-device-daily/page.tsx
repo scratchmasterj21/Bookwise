@@ -28,7 +28,7 @@ export default function BookDeviceDailyPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
-  const [tableKey, setTableKey] = useState(Date.now()); // Key to reset DailyBookingTable
+  const [tableKey, setTableKey] = useState(Date.now()); 
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -205,7 +205,7 @@ export default function BookDeviceDailyPage() {
        toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed for ${details.deviceName}. Please try again.`, variant: "destructive" });
     }
     
-    setTableKey(Date.now()); // Force re-render of table to reset its internal multi-select state
+    setTableKey(Date.now()); 
     setIsProcessingGlobal(false);
   };
 
@@ -213,9 +213,9 @@ export default function BookDeviceDailyPage() {
   if (authLoading || (isLoading && devices.length === 0)) {
      return (
         <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <Skeleton className="h-10 w-1/3" />
-            <Skeleton className="h-10 w-48" />
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
+            <Skeleton className="h-10 w-full sm:w-1/3" />
+            <Skeleton className="h-10 w-full sm:w-48" />
           </div>
           <Skeleton className="h-[500px] w-full" />
         </div>
@@ -226,14 +226,14 @@ export default function BookDeviceDailyPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-semibold font-headline">Daily Device Bookings</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {isProcessingGlobal && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
                 className={cn(
-                  "w-[280px] justify-start text-left font-normal shadow-sm",
+                  "w-full sm:w-[280px] justify-start text-left font-normal shadow-sm",
                   !selectedDate && "text-muted-foreground"
                 )}
                 disabled={isProcessingGlobal}
@@ -298,5 +298,3 @@ export default function BookDeviceDailyPage() {
     </div>
   );
 }
-
-    

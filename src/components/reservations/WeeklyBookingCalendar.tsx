@@ -541,7 +541,7 @@ export default function WeeklyBookingCalendar({
         if (isAdmin || cellData.mainReservation.userId === user?.uid) {
              handleSlotAction(day, period, 'edit', cellData.mainReservation);
         } else { 
-            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ↳ ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ↳ ${be.purpose}` : ''}`).join('; ');
+            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ↳ ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ↳ ${be.purpose}` : ''}${be.notes ? ` - ↳ Notes: ${be.notes}` : ''}`).join('; ');
             toast({ title: "Booking Details", description: `${cellData.bookingEntries && cellData.bookingEntries[0].itemName}: ${bookingDetailsString}` });
         }
     } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'booked' && selectedItemId !== ALL_ITEMS_ID && itemType === 'device') || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalAvailableUnits !== undefined && cellData.totalAvailableUnits > 0) || (cellData.status === 'available' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalPotentialUnits !== undefined && cellData.totalPotentialUnits > 0 )) {
@@ -691,10 +691,10 @@ export default function WeeklyBookingCalendar({
 
   return (
     <Card className="shadow-xl w-full animate-subtle-fade-in border-border">
-      <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 pb-4 pt-4 px-4 border-b bg-primary/5">
-        <div className="flex items-center gap-3 w-full md:w-auto">
+      <CardHeader className="flex flex-col lg:flex-row items-start lg:items-center justify-between space-y-4 lg:space-y-0 lg:space-x-4 pb-4 pt-4 px-4 border-b bg-primary/5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
           <Select value={selectedItemId} onValueChange={setSelectedItemId} disabled={isProcessingGlobal || isSlotProcessing || (isMultiPeriodMode) }>
-            <SelectTrigger className="w-full md:w-[320px] bg-background shadow-sm">
+            <SelectTrigger className="w-full sm:w-[320px] bg-background shadow-sm text-sm">
               <SelectValue placeholder={`Select a ${itemDisplayName.toLowerCase()} or View All`} />
             </SelectTrigger>
             <SelectContent>
@@ -713,7 +713,7 @@ export default function WeeklyBookingCalendar({
             </SelectContent>
           </Select>
            {selectedItemId !== ALL_ITEMS_ID && currentSelectedItem && onConfirmMultiBook && (
-            <div className="flex items-center space-x-2 ml-2">
+            <div className="flex items-center space-x-2 pt-2 sm:pt-0">
               <Switch
                 id="multi-period-mode"
                 checked={isMultiPeriodMode}
@@ -728,40 +728,44 @@ export default function WeeklyBookingCalendar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-center md:justify-end">
+        <div className="flex flex-col items-stretch sm:items-center sm:flex-row gap-2 w-full lg:w-auto lg:justify-end">
          {isMultiPeriodMode && selectedMultiSlots.size > 0 && currentSelectedItem && onConfirmMultiBook && (
             <Button 
               onClick={handleOpenMultiBookModal} 
               size="sm" 
-              className="bg-accent hover:bg-accent/90 text-accent-foreground mr-3"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto"
               disabled={isSlotProcessing || isProcessingGlobal}
             >
               <CheckSquare className="mr-2 h-4 w-4" />
               Book {selectedMultiSlots.size} Selected Period{selectedMultiSlots.size > 1 ? 's' : ''}
             </Button>
           )}
-          <h3 className="text-lg font-semibold text-foreground text-center md:text-left mr-3">
-            {format(currentDate, 'MMM dd')} - {format(addDays(currentDate, 4), 'MMM dd, yyyy')}
-          </h3>
-          <Button variant="outline" size="icon" onClick={handlePrevWeek} disabled={isProcessingGlobal || isSlotProcessing} aria-label="Previous week" className="hover:bg-primary/10">
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <Button variant="outline" onClick={handleToday} disabled={isProcessingGlobal || isSlotProcessing} className="bg-accent text-accent-foreground hover:bg-accent/90">Today</Button>
-          <Button variant="outline" size="icon" onClick={handleNextWeek} disabled={isProcessingGlobal || isSlotProcessing} aria-label="Next week" className="hover:bg-primary/10">
-            <ChevronRight className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center justify-between sm:justify-start gap-2">
+            <h3 className="text-md sm:text-lg font-semibold text-foreground text-center md:text-left whitespace-nowrap">
+                {format(currentDate, 'MMM dd')} - {format(addDays(currentDate, 4), 'MMM dd, yyyy')}
+            </h3>
+            <div className="flex items-center gap-1 sm:gap-2">
+                <Button variant="outline" size="icon" onClick={handlePrevWeek} disabled={isProcessingGlobal || isSlotProcessing} aria-label="Previous week" className="hover:bg-primary/10 h-8 w-8 sm:h-9 sm:w-9">
+                    <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+                <Button variant="outline" onClick={handleToday} disabled={isProcessingGlobal || isSlotProcessing} className="bg-accent text-accent-foreground hover:bg-accent/90 h-8 px-2 sm:h-9 sm:px-3 text-xs sm:text-sm">Today</Button>
+                <Button variant="outline" size="icon" onClick={handleNextWeek} disabled={isProcessingGlobal || isSlotProcessing} aria-label="Next week" className="hover:bg-primary/10 h-8 w-8 sm:h-9 sm:w-9">
+                    <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+            </div>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         {items.length > 0 || selectedItemId === ALL_ITEMS_ID ? ( 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm min-w-[1020px]">
+            <table className="w-full border-collapse text-sm min-w-[1020px]"> {/* min-w adjusted for 5 days + period col */}
               <thead>
                 <tr className="bg-muted">
-                  <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[150px]">Period</th>
+                  <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[120px] sm:min-w-[150px]">Period</th>
                   {weekDays.map(day => (
                     <th key={day.toISOString()} className={cn(
-                        "p-2 border-b border-r text-center min-w-[180px] font-semibold text-foreground align-middle h-16",
+                        "p-2 border-b border-r text-center min-w-[150px] sm:min-w-[180px] font-semibold text-foreground align-middle h-16",
                         isToday(day) ? 'bg-primary/20 ' : '' 
                       )}>
                       {format(day, 'EEE')} <br /> <span className="font-normal text-xs text-muted-foreground">{format(day, 'MMM dd')}</span>
@@ -772,7 +776,7 @@ export default function WeeklyBookingCalendar({
               <tbody>
                 {periods.map(period => (
                   <tr key={period.name} className="even:bg-background odd:bg-muted/20">
-                    <td className="p-2 border-r text-center sticky left-0 z-10 align-middle h-[75px] even:bg-background odd:bg-muted/20 min-w-[150px]">
+                    <td className="p-2 border-r text-center sticky left-0 z-10 align-middle h-[75px] even:bg-background odd:bg-muted/20 min-w-[120px] sm:min-w-[150px]">
                        <div className="text-sm font-semibold text-foreground">{period.name}</div>
                        <div className="text-xs text-muted-foreground mt-0.5">{period.label}</div>
                     </td>

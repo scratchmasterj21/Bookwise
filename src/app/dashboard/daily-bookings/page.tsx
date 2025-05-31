@@ -57,8 +57,8 @@ export default function DailyBookingsPage() {
   }, [authLoading, fetchData]);
 
   const handleBookSlot = async (bookingDetails: {
-    itemId: string; // was roomId
-    itemName: string; // was roomName
+    itemId: string; 
+    itemName: string; 
     startTime: Date;
     endTime: Date;
     purpose: string;
@@ -207,9 +207,9 @@ export default function DailyBookingsPage() {
   if (authLoading || (isLoading && rooms.length === 0)) {
      return (
         <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <Skeleton className="h-10 w-1/3" />
-            <Skeleton className="h-10 w-48" />
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
+            <Skeleton className="h-10 w-full sm:w-1/3" />
+            <Skeleton className="h-10 w-full sm:w-48" />
           </div>
           <Skeleton className="h-[500px] w-full" />
         </div>
@@ -220,14 +220,14 @@ export default function DailyBookingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-semibold font-headline">Daily Room Bookings</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {isProcessingGlobal && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
                 className={cn(
-                  "w-[280px] justify-start text-left font-normal shadow-sm",
+                  "w-full sm:w-[280px] justify-start text-left font-normal shadow-sm",
                   !selectedDate && "text-muted-foreground"
                 )}
                 disabled={isProcessingGlobal}
@@ -263,9 +263,9 @@ export default function DailyBookingsPage() {
           itemType="room"
           reservations={reservations}
           onBookSlot={handleBookSlot}
-          onUpdateSlot={handleUpdateSlot as any} // Cast to allow specific details type
+          onUpdateSlot={handleUpdateSlot as any} 
           onDeleteSlot={handleDeleteSlotRequest}
-          onConfirmMultiBookDaily={handleConfirmMultiBookRoomDaily as any} // Cast to allow specific details type
+          onConfirmMultiBookDaily={handleConfirmMultiBookRoomDaily as any} 
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
           itemDisplayName="Room"
@@ -292,4 +292,3 @@ export default function DailyBookingsPage() {
     </div>
   );
 }
-
