@@ -759,8 +759,7 @@ export default function WeeklyBookingCalendar({
       <CardContent className="p-0">
         {items.length > 0 || selectedItemId === ALL_ITEMS_ID ? ( 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm min-w-[1020px]"> {/* min-w adjusted for 5 days + period col */}
-              <thead>
+            <table className="w-full border-collapse text-sm min-w-[1020px]"><thead>
                 <tr className="bg-muted">
                   <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[120px] sm:min-w-[150px]">Period</th>
                   {weekDays.map(day => (
