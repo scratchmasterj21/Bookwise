@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -31,6 +32,9 @@ body {
 
     --destructive: 0 72% 51%; /* Adjusted destructive to fit theme, e.g. a clearer red */
     --destructive-foreground: 0 0% 98%;
+
+    --success: 140 60% 45%; /* Clear Green */
+    --success-foreground: 210 40% 98%; /* Light color for text on success */
 
     --border: 205 30% 88%; /* Border color */
     --input: 205 30% 94%; /* Input background */
@@ -80,6 +84,9 @@ body {
 
     --destructive: 0 60% 45%;
     --destructive-foreground: 0 0% 98%;
+    
+    --success: 140 50% 40%; /* Dark mode success green */
+    --success-foreground: 210 30% 95%; /* Light text on dark success */
 
     --border: 205 20% 35%;
     --input: 205 20% 30%;

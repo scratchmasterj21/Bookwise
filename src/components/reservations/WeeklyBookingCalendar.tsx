@@ -39,7 +39,7 @@ interface BookingEntry {
   isCurrentUserBooking: boolean;
   devicePurposes?: string[];
   notes?: string;
-  purpose?: string; // For rooms
+  purpose?: string; 
   itemName?: string;
 }
 
@@ -68,7 +68,7 @@ interface ItemStyling {
 interface SelectedMultiSlotInfo {
   day: Date;
   period: TimePeriod;
-  availableInSlot: number; // For devices, actual available units; for rooms, 1 if available, 0 if not.
+  availableInSlot: number; 
 }
 
 interface WeeklyBookingCalendarProps {
@@ -80,33 +80,33 @@ interface WeeklyBookingCalendarProps {
     itemName: string;
     startTime: Date;
     endTime: Date;
-    purpose?: string; // For rooms
-    devicePurposes?: string[]; // For devices
-    notes?: string; // For devices
-    bookedQuantity?: number; // For devices
+    purpose?: string; 
+    devicePurposes?: string[]; 
+    notes?: string; 
+    bookedQuantity?: number; 
   }) => Promise<void>;
    onUpdateSlot: (reservationId: string, newDetails: {
-    purpose?: string; // For rooms
-    devicePurposes?: string[]; // For devices
-    notes?: string; // For devices
-    bookedQuantity?: number; // For devices
+    purpose?: string; 
+    devicePurposes?: string[]; 
+    notes?: string; 
+    bookedQuantity?: number; 
   }) => Promise<void>;
   onDeleteSlot: (reservationId: string) => void;
   onConfirmMultiBook?: (details: { 
     itemId: string;
     itemName: string;
     slots: { day: Date; period: TimePeriod }[];
-    quantity?: number; // For devices
-    devicePurposes?: string[]; // For devices
-    notes?: string; // For devices
-    purpose?: string; // For rooms
+    quantity?: number; 
+    devicePurposes?: string[]; 
+    notes?: string; 
+    purpose?: string; 
   }) => Promise<void>;
   periods: TimePeriod[];
   initialDate?: Date;
   isProcessingGlobal?: boolean;
   itemDisplayName?: string;
   bookingModalPurposeLabel?: string;
-  key?: string | number; // For forcing re-render
+  key?: string | number; 
 }
 
 
@@ -149,7 +149,7 @@ const getItemStyling = (item: Item, itemTypeProp: 'room' | 'device'): ItemStylin
 
 const getLastName = (fullName?: string): string => {
   if (!fullName) return 'User';
-  return fullName; // Per user request, show full name or whatever is stored
+  return fullName; 
 };
 
 
@@ -196,18 +196,15 @@ export default function WeeklyBookingCalendar({
   const [selectedMultiSlots, setSelectedMultiSlots] = useState<Map<string, SelectedMultiSlotInfo>>(new Map());
   const [multiBookModalOpen, setMultiBookModalOpen] = useState(false);
   
-  // For device multi-booking modal
   const [multiBookQuantity, setMultiBookQuantity] = useState<number>(1);
   const [multiBookPurposes, setMultiBookPurposes] = useState<string[]>([]);
   const [multiBookNotes, setMultiBookNotes] = useState('');
-  // For room multi-booking modal
   const [multiBookRoomPurpose, setMultiBookRoomPurpose] = useState('');
 
-
-  const [bookingPurpose, setBookingPurpose] = useState(''); // For single room booking
-  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); // For single device booking
-  const [bookingNotes, setBookingNotes] = useState(''); // For single device booking
-  const [bookingQuantity, setBookingQuantity] = useState<number>(1); // For single device booking
+  const [bookingPurpose, setBookingPurpose] = useState(''); 
+  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); 
+  const [bookingNotes, setBookingNotes] = useState(''); 
+  const [bookingQuantity, setBookingQuantity] = useState<number>(1); 
 
   const [modalSelectedItemIdForBooking, setModalSelectedItemIdForBooking] = useState<string | undefined>(undefined);
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
@@ -227,14 +224,13 @@ export default function WeeklyBookingCalendar({
   }, [bookingModalOpen]);
 
   useEffect(() => {
-    // Disable multi-period mode if "All Items" is selected or item type changes
-    if (selectedItemId === ALL_ITEMS_ID || (currentSelectedItem && currentSelectedItem.id !== selectedItemId) ) {
+    if (selectedItemId === ALL_ITEMS_ID ) {
       setIsMultiPeriodMode(false); 
     }
     if (!isMultiPeriodMode) { 
         setSelectedMultiSlots(new Map());
     }
-  }, [selectedItemId, currentSelectedItem, isMultiPeriodMode]);
+  }, [selectedItemId, isMultiPeriodMode]);
 
 
   const handleDevicePurposeChange = (purpose: string) => {
@@ -290,7 +286,7 @@ export default function WeeklyBookingCalendar({
       setCurrentBookingSlot({ day, period, item: targetItem, existingReservation });
       if (itemType === 'room') {
         setBookingPurpose(existingReservation.purpose || '');
-      } else { // Device
+      } else { 
         setSelectedDevicePurposes(existingReservation.devicePurposes || []);
         setBookingNotes(existingReservation.notes || '');
         setBookingQuantity(existingReservation.bookedQuantity || 1);
@@ -306,10 +302,13 @@ export default function WeeklyBookingCalendar({
              setCurrentBookingSlot({ day, period, item: targetItem });
              setModalSelectedItemIdForBooking(targetItem?.id);
         }
-        setBookingPurpose('');
-        setSelectedDevicePurposes([]);
-        setBookingNotes('');
-        setBookingQuantity(1);
+        if (itemType === 'room') {
+            setBookingPurpose('');
+        } else {
+            setSelectedDevicePurposes([]);
+            setBookingNotes('');
+            setBookingQuantity(1);
+        }
         setEditingReservationId(null);
     }
     setBookingModalOpen(true);
@@ -333,7 +332,6 @@ export default function WeeklyBookingCalendar({
         setIsSlotProcessing(false);
         return;
     }
-
 
     const itemToBookOrUpdate = items.find(i => i.id === finalItemId);
 
@@ -428,7 +426,7 @@ export default function WeeklyBookingCalendar({
     const bookingEntries: BookingEntry[] = slotReservations.map(res => ({
         reservationId: res.id,
         bookedBy: res.bookedBy || res.userName,
-        bookedQuantity: res.bookedQuantity || (itemType === 'device' ? 1 : 0), // 0 or undefined for rooms
+        bookedQuantity: res.bookedQuantity || (itemType === 'device' ? 1 : 0), 
         isCurrentUserBooking: res.userId === user?.uid,
         devicePurposes: res.devicePurposes,
         notes: res.notes,
@@ -450,7 +448,7 @@ export default function WeeklyBookingCalendar({
     if (availableQuantity <= 0 && itemType === 'device') { 
         return { status: 'all-booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
     }
-    if (bookingEntries.length > 0) { // For rooms, any booking means it's booked. For devices, it means some units are booked.
+    if (bookingEntries.length > 0) { 
         return { status: itemType === 'room' ? 'all-booked' : 'booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
     }
     return { status: 'available', isPast: false, itemName: currentItem.name, displayText: itemType === 'device' ? `Available (${itemTotalQuantity})` : "Available", itemTotalQuantity, availableQuantity, bookedUnits: totalBookedUnits };
@@ -543,7 +541,7 @@ export default function WeeklyBookingCalendar({
         if (isAdmin || cellData.mainReservation.userId === user?.uid) {
              handleSlotAction(day, period, 'edit', cellData.mainReservation);
         } else { 
-            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ${be.devicePurposes.join('/')}` : be.purpose ? ` - ${be.purpose}` : ''}`).join('; ');
+            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ↳ ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ↳ ${be.purpose}` : ''}`).join('; ');
             toast({ title: "Booking Details", description: `${cellData.bookingEntries && cellData.bookingEntries[0].itemName}: ${bookingDetailsString}` });
         }
     } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'booked' && selectedItemId !== ALL_ITEMS_ID && itemType === 'device') || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalAvailableUnits !== undefined && cellData.totalAvailableUnits > 0) || (cellData.status === 'available' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalPotentialUnits !== undefined && cellData.totalPotentialUnits > 0 )) {
@@ -558,7 +556,9 @@ export default function WeeklyBookingCalendar({
   };
   
   const getMaxBookableQuantity = () => {
-    if (!currentBookingSlot || itemType !== 'device') return 1; // Rooms always book 1 unit
+    if (!currentBookingSlot) return 1;
+    if (itemType !== 'device') return 1; 
+    
     const { day, period, item: modalItem, existingReservation } = currentBookingSlot;
     
     let itemForCalc: Item | null | undefined = null;
@@ -570,8 +570,7 @@ export default function WeeklyBookingCalendar({
         itemForCalc = currentSelectedItem;
     }
 
-
-    if (itemType === 'device' && itemForCalc) {
+    if (itemForCalc) {
       const device = itemForCalc as Device;
       const reservationsInSlot = getReservationsForSlot(day, period, device.id);
       let totalBookedByOthers = 0;
@@ -595,7 +594,6 @@ export default function WeeklyBookingCalendar({
     }
     const itemForModal = items.find(i => i.id === itemForModalId);
 
-
     if (!itemForModal && !editingReservationId) return true; 
 
     if (itemType === 'room' && !bookingPurpose.trim()) return true;
@@ -617,7 +615,7 @@ export default function WeeklyBookingCalendar({
       setMultiBookQuantity(1); 
       setMultiBookPurposes([]);
       setMultiBookNotes('');
-    } else { // room
+    } else { 
       setMultiBookRoomPurpose('');
     }
     setMultiBookModalOpen(true);
@@ -660,7 +658,7 @@ export default function WeeklyBookingCalendar({
         multiBookDetails.quantity = multiBookQuantity;
         multiBookDetails.devicePurposes = multiBookPurposes;
         multiBookDetails.notes = multiBookNotes;
-     } else { // room
+     } else { 
         if (!multiBookRoomPurpose.trim()) {
             toast({ title: "Purpose Required", description: "Please enter a purpose for the room booking.", variant: "destructive" });
             return;
@@ -685,7 +683,7 @@ export default function WeeklyBookingCalendar({
     if (isSlotProcessing || isProcessingGlobal || !currentSelectedItem || selectedMultiSlots.size === 0) return true;
     if (itemType === 'device') {
       return multiBookPurposes.length === 0 || multiBookQuantity < 1 || multiBookQuantity > maxQuantityForMultiBookDevice || maxQuantityForMultiBookDevice === 0;
-    } else { // room
+    } else { 
       return !multiBookRoomPurpose.trim();
     }
   };
@@ -735,7 +733,7 @@ export default function WeeklyBookingCalendar({
             <Button 
               onClick={handleOpenMultiBookModal} 
               size="sm" 
-              className="bg-green-600 hover:bg-green-700 text-white mr-3"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground mr-3"
               disabled={isSlotProcessing || isProcessingGlobal}
             >
               <CheckSquare className="mr-2 h-4 w-4" />
@@ -755,7 +753,7 @@ export default function WeeklyBookingCalendar({
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {items.length > 0 || selectedItemId === ALL_ITEMS_ID ? ( // Ensure table shows if "All Items" is selected even if items array is initially empty
+        {items.length > 0 || selectedItemId === ALL_ITEMS_ID ? ( 
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm min-w-[1020px]">
               <thead>
@@ -821,8 +819,8 @@ export default function WeeklyBookingCalendar({
                               </div>
                             )}
                             { (cellData.status === 'booked' || cellData.status === 'all-booked') && selectedItemId !== ALL_ITEMS_ID && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
-                               <div className={cn("flex flex-col w-full h-full space-y-0.5 text-[10px] leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
-                                  <span className={cn("block font-semibold", currentItemStyling.textClass)}>
+                               <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
+                                  <span className={cn("block font-semibold text-sm", currentItemStyling.textClass)}>
                                     {cellData.bookingEntries[0].itemName}
                                   </span>
                                   <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
@@ -830,9 +828,9 @@ export default function WeeklyBookingCalendar({
                                       {cellData.bookingEntries.map(entry => (
                                         <li key={entry.reservationId} className={cn(entry.isCurrentUserBooking && "font-semibold text-primary")}>
                                           {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                          {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.purpose}</span>}
-                                          {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                          {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[9px] pl-2">↳ Notes: {entry.notes}</span>}
+                                          {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                          {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                          {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
                                         </li>
                                       ))}
                                     </ul>
@@ -864,15 +862,15 @@ export default function WeeklyBookingCalendar({
                                     </span>
                                 </div>
                             ) : (cellData.isPast && cellData.status === 'past-booked' && cellData.bookingEntries && cellData.bookingEntries.length > 0 ) ? (
-                                <div className={cn("flex flex-col w-full h-full space-y-0.5 text-[10px] leading-tight opacity-60")}>
-                                     <span className={cn("block font-semibold", currentItemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
+                                <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight opacity-60")}>
+                                     <span className={cn("block font-semibold text-sm", currentItemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
                                      <ul className="space-y-0.5">
                                       {cellData.bookingEntries.map(entry => (
                                         <li key={entry.reservationId}>
                                           {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                          {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.purpose}</span>}
-                                          {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                          {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[9px] pl-2">↳ Notes: {entry.notes}</span>}
+                                          {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                          {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                          {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
                                         </li>
                                       ))}
                                     </ul>
@@ -942,7 +940,7 @@ export default function WeeklyBookingCalendar({
                             const itemTotalQty = (item as Device).quantity;
                             return itemTotalQty - bookedUnitsForItem > 0;
                            }
-                           return specificItemReservations.length === 0; // Room is available if no reservations
+                           return specificItemReservations.length === 0; 
                         })
                         .map(item => {
                            let availableUnitsText = "";
@@ -1171,4 +1169,3 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
-

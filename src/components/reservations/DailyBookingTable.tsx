@@ -32,11 +32,11 @@ type Item = Room | Device;
 interface BookingEntry {
   reservationId: string;
   bookedBy?: string;
-  bookedQuantity: number; // Will be 0 or undefined for rooms in UI, 1 implicitly.
+  bookedQuantity: number; 
   isCurrentUserBooking: boolean;
   devicePurposes?: string[];
   notes?: string;
-  purpose?: string; // For rooms
+  purpose?: string; 
   itemName?: string;
 }
 
@@ -59,7 +59,7 @@ interface ItemStyling {
 }
 
 interface SelectedMultiSlotInfoDaily {
-  item: Item; // Changed from device to item
+  item: Item; 
   period: TimePeriod;
   availableInSlot: number;
 }
@@ -120,7 +120,6 @@ const getIconForItemType = (itemTypeProp: 'room' | 'device', itemDetail?: Device
         default: return Package;
     }
   }
-  // Can add room icons here if needed
   return undefined;
 };
 
@@ -147,13 +146,13 @@ interface DailyBookingTableProps {
   }) => Promise<void>;
   onDeleteSlot: (reservationId: string) => void;
   onConfirmMultiBookDaily?: (details: {
-    itemId: string; // Changed from deviceId
-    itemName: string; // Changed from deviceName
+    itemId: string; 
+    itemName: string; 
     periods: TimePeriod[];
-    quantity?: number; // Optional for devices
-    devicePurposes?: string[]; // Optional for devices
-    notes?: string; // Optional for devices
-    purpose?: string; // Optional for rooms
+    quantity?: number; 
+    devicePurposes?: string[]; 
+    notes?: string; 
+    purpose?: string; 
   }) => Promise<void>;
   periods: TimePeriod[];
   isProcessingGlobal?: boolean;
@@ -184,26 +183,22 @@ export default function DailyBookingTable({
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [currentBookingSlot, setCurrentBookingSlot] = useState<{item: Item, period: TimePeriod, existingReservation?: Reservation} | null>(null);
 
-  // Single booking modal state
-  const [bookingPurpose, setBookingPurpose] = useState(''); // For rooms
-  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); // For devices
-  const [bookingNotes, setBookingNotes] = useState(''); // For devices
-  const [bookingQuantity, setBookingQuantity] = useState<number>(1); // For devices
+  const [bookingPurpose, setBookingPurpose] = useState(''); 
+  const [selectedDevicePurposes, setSelectedDevicePurposes] = useState<string[]>([]); 
+  const [bookingNotes, setBookingNotes] = useState(''); 
+  const [bookingQuantity, setBookingQuantity] = useState<number>(1); 
 
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
-  // Multi-period booking state
   const [isMultiPeriodMode, setIsMultiPeriodMode] = useState(false);
   const [selectedMultiSlots, setSelectedMultiSlots] = useState<Map<string, SelectedMultiSlotInfoDaily>>(new Map());
   const [multiBookModalOpen, setMultiBookModalOpen] = useState(false);
   const [multiBookTargetItem, setMultiBookTargetItem] = useState<Item | null>(null);
   const [multiBookSelectedPeriodsForItem, setMultiBookSelectedPeriodsForItem] = useState<TimePeriod[]>([]);
-  // For device multi-booking
   const [multiBookQuantity, setMultiBookQuantity] = useState<number>(1);
   const [multiBookPurposes, setMultiBookPurposes] = useState<string[]>([]);
   const [multiBookNotes, setMultiBookNotes] = useState('');
-  // For room multi-booking
   const [multiBookRoomPurpose, setMultiBookRoomPurpose] = useState('');
 
 
@@ -282,10 +277,13 @@ export default function DailyBookingTable({
       setEditingReservationId(existingReservation.id);
     } else if (actionType === 'book') {
       setCurrentBookingSlot({ item, period });
-      setBookingPurpose(''); 
-      setSelectedDevicePurposes([]);
-      setBookingNotes('');
-      setBookingQuantity(1);
+      if (itemType === 'room') {
+        setBookingPurpose(''); 
+      } else {
+        setSelectedDevicePurposes([]);
+        setBookingNotes('');
+        setBookingQuantity(1);
+      }
       setEditingReservationId(null);
     }
     setBookingModalOpen(true);
@@ -412,7 +410,6 @@ export default function DailyBookingTable({
       return; 
     }
 
-
     if (cellData.isPast) {
       if(cellData.bookingEntries && cellData.bookingEntries.length > 0) {
         const description = itemType === 'device'
@@ -432,7 +429,7 @@ export default function DailyBookingTable({
         if (isAdmin || cellData.mainReservation.userId === user?.uid) {
              handleSlotAction(item, period, 'edit', cellData.mainReservation);
         } else { 
-            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ${be.devicePurposes.join('/')}` : be.purpose ? ` - ${be.purpose}` : ''}`).join('; ');
+            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ↳ ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ↳ ${be.purpose}` : ''}`).join('; ');
             toast({ title: "Booking Details", description: `${item.name}: ${bookingDetailsString}` });
         }
     } else if (cellData.status === 'available' || (cellData.status === 'booked' && itemType === 'device')) { 
@@ -458,7 +455,6 @@ export default function DailyBookingTable({
     const maxQty = device.quantity - totalBookedByOthers;
     return Math.max(0, maxQty);
   };
-
 
   const isBookingButtonDisabled = () => {
     if (isSlotProcessing || isProcessingGlobal) return true;
@@ -534,7 +530,7 @@ export default function DailyBookingTable({
         multiBookDetails.quantity = multiBookQuantity;
         multiBookDetails.devicePurposes = multiBookPurposes;
         multiBookDetails.notes = multiBookNotes;
-    } else { // room
+    } else { 
         if (!multiBookRoomPurpose.trim()) {
             toast({ title: "Purpose Required", description: "Please enter a purpose for the room booking.", variant: "destructive" });
             return;
@@ -559,7 +555,7 @@ export default function DailyBookingTable({
     if (isSlotProcessing || isProcessingGlobal || !multiBookTargetItem || multiBookSelectedPeriodsForItem.length === 0) return true;
     if (itemType === 'device') {
       return multiBookPurposes.length === 0 || multiBookQuantity < 1 || multiBookQuantity > maxQuantityForMultiBookDevice || maxQuantityForMultiBookDevice === 0;
-    } else { // room
+    } else { 
       return !multiBookRoomPurpose.trim();
     }
   };
@@ -574,7 +570,7 @@ export default function DailyBookingTable({
                <Button
                  onClick={handleOpenMultiBookModal}
                  size="sm"
-                 className="bg-green-600 hover:bg-green-700 text-white"
+                 className="bg-accent hover:bg-accent/90 text-accent-foreground"
                  disabled={isProcessingGlobal || isSlotProcessing}
                >
                  <CheckSquare className="mr-2 h-4 w-4" />
@@ -662,8 +658,8 @@ export default function DailyBookingTable({
                               </div>
                             )}
                           { (cellData.status === 'booked' || cellData.status === 'all-booked') && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
-                             <div className={cn("flex flex-col w-full h-full space-y-0.5 text-[10px] leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
-                                <span className={cn("block font-semibold", itemStyling.textClass)}>
+                             <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
+                                <span className={cn("block font-semibold text-sm", itemStyling.textClass)}>
                                   {cellData.bookingEntries[0].itemName}
                                 </span>
                                 <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
@@ -671,9 +667,9 @@ export default function DailyBookingTable({
                                     {cellData.bookingEntries.map(entry => (
                                       <li key={entry.reservationId} className={cn(entry.isCurrentUserBooking && "font-semibold text-primary")}>
                                         {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.purpose}</span>}
-                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[9px] pl-2">↳ Notes: {entry.notes}</span>}
+                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
                                       </li>
                                     ))}
                                   </ul>
@@ -690,15 +686,15 @@ export default function DailyBookingTable({
                                   <span className={cn("font-medium text-xs text-primary")}>{cellData.displayText}</span>
                               </div>
                           ) : cellData.isPast && cellData.status === 'past-booked' && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
-                              <div className={cn("flex flex-col w-full h-full space-y-0.5 text-[10px] leading-tight opacity-60")}>
-                                  <span className={cn("block font-semibold", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
+                              <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight opacity-60")}>
+                                  <span className={cn("block font-semibold text-sm", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
                                   <ul className="space-y-0.5">
                                     {cellData.bookingEntries.map(entry => (
                                       <li key={entry.reservationId}>
                                         {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.purpose}</span>}
-                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[9px] pl-2">↳ Notes: {entry.notes}</span>}
+                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
                                       </li>
                                     ))}
                                   </ul>
@@ -929,5 +925,3 @@ export default function DailyBookingTable({
     </Card>
   );
 }
-
-    

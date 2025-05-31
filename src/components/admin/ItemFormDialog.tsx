@@ -240,7 +240,7 @@ export default function ItemFormDialog({
       {triggerButton && <DialogTrigger asChild>{triggerButton}</DialogTrigger>}
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle className="font-headline">{isEditing ? `Edit ${itemType}` : `Add New ${itemType}`}</DialogTitle>
+          <DialogTitle className="font-headline text-xl">{isEditing ? `Edit ${itemType}` : `Add New ${itemType}`}</DialogTitle>
           <DialogDescription>
             Fill in the details for the {itemType}. Click save when you're done.
           </DialogDescription>
@@ -438,4 +438,3 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
-

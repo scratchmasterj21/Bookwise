@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Reservation, ReservationStatus } from '@/types';
@@ -23,11 +24,11 @@ interface ReservationsTableProps {
   onReject?: (reservationId: string) => void;
 }
 
-const getStatusVariant = (status: ReservationStatus): "default" | "secondary" | "destructive" | "outline" => {
+const getStatusVariant = (status: ReservationStatus): "default" | "secondary" | "destructive" | "outline" | "success" => {
   switch (status) {
     case 'approved':
     case 'active':
-      return 'default'; // Consider a success variant if Shadcn theme has one e.g. bg-green-500
+      return 'success'; 
     case 'pending':
       return 'secondary';
     case 'rejected':
@@ -81,19 +82,19 @@ export default function ReservationsTable({
                   {reservation.status}
                 </Badge>
               </TableCell>
-              <TableCell className="text-right space-x-2">
+              <TableCell className="text-right space-x-1">
                 {isAdminView && reservation.status === 'pending' && onApprove && onReject && (
                   <>
-                    <Button variant="ghost" size="icon" onClick={() => onApprove(reservation.id)} className="text-green-600 hover:text-green-700">
+                    <Button variant="ghost" size="icon" onClick={() => onApprove(reservation.id)} className="text-primary hover:text-primary/90 hover:bg-primary/10">
                       <CheckCircle2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => onReject(reservation.id)} className="text-red-600 hover:text-red-700">
+                    <Button variant="ghost" size="icon" onClick={() => onReject(reservation.id)} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10">
                       <XCircle className="h-4 w-4" />
                     </Button>
                   </>
                 )}
                 {!isAdminView && (reservation.status === 'pending' || reservation.status === 'approved' || reservation.status === 'active') && onCancel && (
-                  <Button variant="outline" size="sm" onClick={() => onCancel(reservation.id)} className="text-destructive hover:bg-destructive/10">
+                  <Button variant="outline" size="sm" onClick={() => onCancel(reservation.id)} className="text-destructive border-destructive hover:bg-destructive/10">
                     <Trash2 className="mr-1 h-4 w-4" /> Cancel
                   </Button>
                 )}
