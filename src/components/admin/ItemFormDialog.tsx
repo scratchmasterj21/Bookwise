@@ -26,11 +26,11 @@ interface ItemFormDialogProps {
   itemType: ItemType;
   itemData?: Item | null;
   triggerButton?: React.ReactNode;
-  onSave: (itemData: Item) => void;
+  onSave: (itemData: Item) => Promise<void>; // Changed to Promise<void>
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  buildings?: Building[]; // For room and device forms
-  allRooms?: Room[]; // For device form, to filter by building
+  buildings?: Building[];
+  allRooms?: Room[];
 }
 
 const deviceTypes: DeviceType[] = ['Laptop', 'Tablet', 'Monitor', 'Projector', 'Other'];
@@ -49,26 +49,21 @@ export default function ItemFormDialog({
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const onOpenChange = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setInternalOpen;
 
-  // Common fields
   const [name, setName] = useState('');
-  const [description, setDescription] = useState(''); // For Device/Room
-  const [imageUrl, setImageUrl] = useState(''); // For Device/Room/Building
-  const [status, setStatus] = useState<'available' | 'booked' | 'maintenance'>('available'); // For Device/Room
+  const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [status, setStatus] = useState<'available' | 'booked' | 'maintenance'>('available');
 
-  // Building specific
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Device specific
   const [specificType, setSpecificType] = useState<DeviceType | ''>('');
   
-  // Room specific
   const [capacity, setCapacity] = useState<number>(0);
-  const [amenities, setAmenities] = useState(''); // Comma-separated
+  const [amenities, setAmenities] = useState('');
 
-  // Location fields for Room/Device
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | undefined>(undefined);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(undefined); // For Device
+  const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(undefined);
 
   const [isSaving, setIsSaving] = useState(false);
   const isEditing = !!itemData?.id;
@@ -78,51 +73,130 @@ export default function ItemFormDialog({
     : [];
 
   useEffect(() => {
-    if (open && itemData) {
-      setName(itemData.name || '');
-      setImageUrl(itemData.imageUrl || '');
+    if (open) {
+      if (itemData) { // Editing existing item
+        setName(itemData.name || '');
+        setImageUrl(itemData.imageUrl || '');
 
-      if (itemType === 'building') {
-        const b = itemData as Building;
-        setLocation(b.location || '');
-        setNotes(b.notes || '');
-      } else if (itemType === 'room') {
-        const r = itemData as Room;
-        setDescription(r.description || '');
-        setStatus(r.status || 'available');
-        setCapacity(r.capacity || 0);
-        setAmenities(r.amenities?.join(', ') || '');
-        setSelectedBuildingId(r.buildingId || undefined);
-      } else if (itemType === 'device') {
-        const d = itemData as Device;
-        setDescription(d.description || '');
-        setStatus(d.status || 'available');
-        setSpecificType(d.type || '');
-        setSelectedBuildingId(d.buildingId || undefined);
-        setSelectedRoomId(d.roomId || undefined);
+        if (itemType === 'building') {
+          const b = itemData as Building;
+          setLocation(b.location || '');
+          setNotes(b.notes || '');
+        } else if (itemType === 'room') {
+          const r = itemData as Room;
+          setDescription(r.description || '');
+          setStatus(r.status || 'available');
+          setCapacity(r.capacity || 0);
+          setAmenities(r.amenities?.join(', ') || '');
+          setSelectedBuildingId(r.buildingId || undefined);
+        } else if (itemType === 'device') {
+          const d = itemData as Device;
+          setDescription(d.description || '');
+          setStatus(d.status || 'available');
+          setSpecificType(d.type || '');
+          setSelectedBuildingId(d.buildingId || undefined);
+          // Ensure selectedRoomId is reset if the building changes or rooms for that building are not available
+          const currentBuildingRooms = itemData.buildingId ? allRooms.filter(room => room.buildingId === itemData.buildingId) : [];
+          if (d.roomId && currentBuildingRooms.find(r => r.id === d.roomId)) {
+            setSelectedRoomId(d.roomId);
+          } else {
+            setSelectedRoomId(undefined);
+          }
+        }
+      } else { // Reset form for new item
+        setName('');
+        setDescription('');
+        setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
+        setStatus('available');
+        setSpecificType('');
+        setCapacity(0);
+        setAmenities('');
+        setLocation('');
+        setNotes('');
+        setSelectedBuildingId(undefined);
+        setSelectedRoomId(undefined);
       }
-    } else if (open && !itemData) {
-      // Reset form for new item
-      setName('');
-      setDescription('');
-      setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
-      setStatus('available');
-      setSpecificType('');
-      setCapacity(0);
-      setAmenities('');
-      setLocation('');
-      setNotes('');
-      setSelectedBuildingId(undefined);
-      setSelectedRoomId(undefined);
     }
-  }, [itemData, itemType, open, allRooms]); // Added allRooms to dependencies for device room filtering
+  }, [open, itemData, itemType, allRooms]); // allRooms IS needed here for device room population/reset if allRooms changes.
+                                         // The issue was specific to 'building' type where allRooms defaults to new [].
+                                         // For building type, allRooms isn't used in the effect logic for its fields.
+                                         // The root cause was default prop `allRooms = []` creating new ref.
+                                         // This is less of an issue if parent `ManageBuildingPage` passes a stable `allRooms` or `undefined`.
+                                         // To be absolutely safe for the typing issue with buildings, the reset specific to `name`, `location`, `notes` should ideally not run if only `allRooms` changed.
+                                         // However, with `ManageBuildingsPage` not passing `allRooms`, `allRooms` in this component is `[]` (new ref each render).
+                                         // Let's refine: the general reset should primarily depend on open/itemData/itemType.
+
+  useEffect(() => {
+    // This effect handles the general form reset and population based on itemData and itemType.
+    // It should not be sensitive to `allRooms` changing for non-device types or for field initializations
+    // that don't depend on `allRooms`.
+    if (open) {
+        if (itemData) { // Editing existing item
+            setName(itemData.name || '');
+            setImageUrl(itemData.imageUrl || '');
+
+            if (itemType === 'building') {
+                const b = itemData as Building;
+                setLocation(b.location || '');
+                setNotes(b.notes || '');
+            } else if (itemType === 'room') {
+                const r = itemData as Room;
+                setDescription(r.description || '');
+                setStatus(r.status || 'available');
+                setCapacity(r.capacity || 0);
+                setAmenities(r.amenities?.join(', ') || '');
+                setSelectedBuildingId(r.buildingId || undefined);
+            } else if (itemType === 'device') {
+                const d = itemData as Device;
+                setDescription(d.description || '');
+                setStatus(d.status || 'available');
+                setSpecificType(d.type || '');
+                setSelectedBuildingId(d.buildingId || undefined);
+                // Room selection logic for devices is handled below, potentially based on allRooms
+            }
+        } else { // Reset form for new item
+            setName('');
+            setDescription('');
+            setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
+            setStatus('available');
+            setSpecificType('');
+            setCapacity(0);
+            setAmenities('');
+            setLocation('');
+            setNotes('');
+            setSelectedBuildingId(undefined);
+            setSelectedRoomId(undefined);
+        }
+    }
+  }, [open, itemData, itemType]); // Removed allRooms from this general effect
+
+  useEffect(() => {
+    // This effect specifically handles initializing/updating selectedRoomId for devices,
+    // especially if allRooms data changes or buildingId changes.
+    if (open && itemType === 'device') {
+        if (itemData) { // Editing a device
+            const d = itemData as Device;
+            const currentBuildingRooms = d.buildingId ? allRooms.filter(room => room.buildingId === d.buildingId) : [];
+            if (d.roomId && currentBuildingRooms.find(r => r.id === d.roomId)) {
+                setSelectedRoomId(d.roomId);
+            } else {
+                setSelectedRoomId(undefined); // Reset if room not valid for current building or not found
+            }
+        } else { // Adding a new device
+             // selectedRoomId is already reset to undefined by the general effect.
+             // If selectedBuildingId changes for a new device, availableRoomsInSelectedBuilding updates,
+             // and the Select component for rooms will correctly show/hide options.
+        }
+    }
+  }, [open, itemData, itemType, selectedBuildingId, allRooms]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     
     const baseData = {
-      id: itemData?.id || undefined, // Let backend generate ID for new items if needed, or generate on client
+      id: itemData?.id || undefined,
       name,
       imageUrl,
     };
@@ -157,10 +231,18 @@ export default function ItemFormDialog({
       } as Device;
     }
     
-    await new Promise(resolve => setTimeout(resolve, 700)); // Simulate save
-    onSave(finalData);
-    setIsSaving(false);
-    onOpenChange(false);
+    try {
+      await onSave(finalData);
+      // Only close dialog if save was successful (onSave didn't throw)
+      // The parent's onSave (handleSaveBuilding/Room/Device) is responsible for toasts.
+      onOpenChange(false); 
+    } catch (error) {
+      // Error is already logged and toasted by the onSave handler in the parent component.
+      // We don't re-throw or toast again here. The dialog remains open.
+      console.error(`Error during ${itemType} save operation in dialog:`, error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -256,14 +338,14 @@ export default function ItemFormDialog({
                 <Label htmlFor="room-select-device" className="text-right">Room</Label>
                 <Select value={selectedRoomId} onValueChange={setSelectedRoomId} disabled={!selectedBuildingId || availableRoomsInSelectedBuilding.length === 0} required>
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder={!selectedBuildingId ? "Select building first" : "Select room"} />
+                    <SelectValue placeholder={!selectedBuildingId ? "Select building first" : (availableRoomsInSelectedBuilding.length === 0 ? "No rooms in building" : "Select room")} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableRoomsInSelectedBuilding.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 {!selectedBuildingId && <span className="col-span-3 col-start-2 text-xs text-muted-foreground">Please select a building to see available rooms.</span>}
-                {selectedBuildingId && availableRoomsInSelectedBuilding.length === 0 && <span className="col-span-3 col-start-2 text-xs text-muted-foreground">No rooms available in selected building.</span>}
+                {selectedBuildingId && availableRoomsInSelectedBuilding.length === 0 && <span className="col-span-3 col-start-2 text-xs text-muted-foreground">No rooms available in selected building. Add rooms to this building first.</span>}
               </div>
             </>
           )}
@@ -277,7 +359,7 @@ export default function ItemFormDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="available">Available</SelectItem>
-                  <SelectItem value="booked">Booked</SelectItem>
+                  <SelectItem value="booked">Booked</SelectItem> {/* Note: status is usually managed by reservations, not directly set here for new items */}
                   <SelectItem value="maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
@@ -296,3 +378,6 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
+
+
+    
