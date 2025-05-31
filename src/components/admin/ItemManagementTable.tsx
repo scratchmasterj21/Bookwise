@@ -59,38 +59,17 @@ export default function ItemManagementTable({
   const renderTableHeader = () => {
     if (itemType === 'building') {
       return (
-        <TableRow>
-          <TableHead>Image</TableHead>
-          <TableHead>Name</TableHead>
-          <TableHead>Location</TableHead>
-          <TableHead className="flex items-center gap-1"><Layers className="h-4 w-4 text-muted-foreground" /> Floors</TableHead> {/* Updated Floor header */}
-          <TableHead>Notes</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
+        <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead className="flex items-center gap-1"><Layers className="h-4 w-4 text-muted-foreground" /> Floors</TableHead><TableHead>Notes</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
       );
     }
     if (itemType === 'room') {
       return (
-        <TableRow>
-          <TableHead>Image</TableHead>
-          <TableHead>Name</TableHead>
-          <TableHead>Building</TableHead>
-          <TableHead>Capacity</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
+        <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Building</TableHead><TableHead>Capacity</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
       );
     }
     // Device (default)
     return (
-      <TableRow>
-        <TableHead>Image</TableHead>
-        <TableHead>Name</TableHead>
-        <TableHead>Type</TableHead>
-        <TableHead>Location (Building/Room)</TableHead>
-        <TableHead>Status</TableHead>
-        <TableHead className="text-right">Actions</TableHead>
-      </TableRow>
+      <TableRow><TableHead>Image</TableHead><TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead>Location (Building/Room)</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
     );
   };
 
@@ -121,7 +100,7 @@ export default function ItemManagementTable({
           {commonImageCell}
           <TableCell className="font-medium">{b.name}</TableCell>
           <TableCell>{b.location || 'N/A'}</TableCell>
-          <TableCell>{b.numberOfFloors || 'N/A'}</TableCell> {/* Updated Floor cell */}
+          <TableCell>{b.numberOfFloors || 'N/A'}</TableCell>
           <TableCell className="truncate max-w-xs">{b.notes || 'N/A'}</TableCell>
           <TableCell className="text-right space-x-1">
             <Button variant="ghost" size="icon" onClick={() => onEdit(b)} className="hover:text-primary">
