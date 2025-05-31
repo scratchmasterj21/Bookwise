@@ -380,18 +380,29 @@ export default function WeeklyBookingCalendar({
 
     if (selectedItemId === ALL_ITEMS_ID) {
         const allSlotReservations = getReservationsForSlot(day, period);
+        const bookingEntries: BookingEntry[] = allSlotReservations.map(res => ({
+            reservationId: res.id,
+            bookedBy: res.bookedBy || res.userName,
+            bookedQuantity: res.bookedQuantity || (itemType === 'device' ? 1 : 0),
+            isCurrentUserBooking: res.userId === user?.uid,
+            devicePurposes: res.devicePurposes,
+            notes: res.notes,
+            purpose: res.purpose,
+            itemName: res.itemName,
+        }));
+
         if (itemType === 'room') {
             const bookedItemCount = new Set(allSlotReservations.map(res => res.itemId)).size;
             const totalItemUnits = items.length; 
             if (isPast) {
-                if (bookedItemCount > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${bookedItemCount} ${itemDisplayName}(s) Booked` };
+                if (bookedItemCount > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${bookedItemCount} ${itemDisplayName}(s) Booked`, bookingEntries };
                 return { status: 'past-available', isPast: true, displayText: "" };
             }
             if (totalItemUnits > 0 && bookedItemCount >= totalItemUnits) {
-                return { status: 'all-booked', isPast: false, displayText: `All ${itemDisplayName}s Booked` };
+                return { status: 'all-booked', isPast: false, displayText: `All ${itemDisplayName}s Booked`, bookingEntries };
             }
             if (bookedItemCount > 0) {
-                 return { status: 'partially-booked', isPast: false, displayText: `${bookedItemCount}/${totalItemUnits} Booked` };
+                 return { status: 'partially-booked', isPast: false, displayText: `${bookedItemCount}/${totalItemUnits} Booked`, bookingEntries };
             }
             return { status: 'available', isPast: false, displayText: "Available" };
         } else { 
@@ -406,16 +417,16 @@ export default function WeeklyBookingCalendar({
             const totalAvailableUnits = totalPotentialUnits - totalBookedUnits;
 
             if (isPast) {
-                if (totalBookedUnits > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${totalBookedUnits} Unit(s) Booked`, totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
-                return { status: 'past-available', isPast: true, displayText: "", totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
+                if (totalBookedUnits > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${totalBookedUnits} Unit(s) Booked`, totalAvailableUnits, totalPotentialUnits, bookingEntries };
+                return { status: 'past-available', isPast: true, displayText: "", totalAvailableUnits, totalPotentialUnits };
             }
             if (totalAvailableUnits <= 0 && totalPotentialUnits > 0) { 
-                return { status: 'all-booked', isPast: false, displayText: "All Device Units Booked", totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
+                return { status: 'all-booked', isPast: false, displayText: "All Device Units Booked", totalAvailableUnits, totalPotentialUnits, bookingEntries };
             }
             if (totalBookedUnits > 0) { 
-                 return { status: 'partially-booked', isPast: false, displayText: `${totalAvailableUnits} of ${totalPotentialUnits} Units Available`, totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
+                 return { status: 'partially-booked', isPast: false, displayText: `${totalAvailableUnits} of ${totalPotentialUnits} Units Available`, totalAvailableUnits, totalPotentialUnits, bookingEntries };
             }
-            return { status: 'available', isPast: false, displayText: totalPotentialUnits > 0 ? `${totalPotentialUnits} Units Available` : "No Devices", totalAvailableUnits: totalAvailableUnits, totalPotentialUnits: totalPotentialUnits };
+            return { status: 'available', isPast: false, displayText: totalPotentialUnits > 0 ? `${totalPotentialUnits} Units Available` : "No Devices", totalAvailableUnits, totalPotentialUnits };
         }
     }
 
@@ -452,7 +463,7 @@ export default function WeeklyBookingCalendar({
         return { status: itemType === 'room' ? 'all-booked' : 'booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
     }
     return { status: 'available', isPast: false, itemName: currentItem.name, displayText: itemType === 'device' ? `Available (${itemTotalQuantity})` : "Available", itemTotalQuantity, availableQuantity, bookedUnits: totalBookedUnits };
-  }, [selectedItemId, getReservationsForSlot, itemType, items, user]);
+  }, [selectedItemId, getReservationsForSlot, itemType, items, user, itemDisplayName]);
 
   const getCellClasses = (day: Date, period: TimePeriod) => {
     const cellData = getCellDisplayData(day, period);
@@ -519,18 +530,23 @@ export default function WeeklyBookingCalendar({
     }
 
     if (cellData.isPast) {
-      if(cellData.bookingEntries && cellData.bookingEntries.length > 0 && itemType === 'device') {
+      if(cellData.bookingEntries && cellData.bookingEntries.length > 0 && (itemType === 'device' || (itemType === 'room' && selectedItemId !== ALL_ITEMS_ID))) {
+        const description = itemType === 'device'
+            ? cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})${be.devicePurposes && be.devicePurposes.length > 0 ? ` - ↳ ${be.devicePurposes.join(', ')}` : ''}${be.notes ? ` - ↳ Notes: ${be.notes}`:''}`).join('; ')
+            : cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} - ${be.purpose}`).join('; ') ;
         toast({
             title: `Past Booking (${cellData.bookingEntries[0].itemName || itemDisplayName})`,
-            description: cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})`).join(', ')
+            description
         });
-      } else if (cellData.bookingEntries && cellData.bookingEntries.length > 0 && itemType === 'room') {
-         toast({
-            title: `Past Booking (${cellData.bookingEntries[0].itemName || itemDisplayName})`,
-            description: `${getLastName(cellData.bookingEntries[0].bookedBy)} - ${cellData.bookingEntries[0].purpose}`
-        });
-      } else if (cellData.status === 'past-booked-all-view') {
-         toast({ title: "Past Bookings", description: cellData.displayText });
+      } else if (cellData.status === 'past-booked-all-view') { // For "All Items" view
+        const title = `Past Bookings for ${format(day, 'MMM dd')} - ${period.name}`;
+        let description = "Details not shown for past aggregated view."; // Default
+        if (cellData.bookingEntries && cellData.bookingEntries.length > 0) {
+            description = cellData.bookingEntries.map(be => 
+                `${be.itemName}: ${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.purpose ? ` - ${be.purpose}` : ''}`
+            ).join('\n');
+        }
+         toast({ title, description });
       } else {
         toast({ title: "Past Slot", description: "This slot cannot be booked."});
       }
@@ -845,38 +861,29 @@ export default function WeeklyBookingCalendar({
                                       </div>
                                   )}
                               </div>
+                            ) : (cellData.status === 'partially-booked' || cellData.status === 'all-booked' || (cellData.status === 'past-booked-all-view' && cellData.isPast) ) && selectedItemId === ALL_ITEMS_ID && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
+                                <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
+                                   {itemType === 'room' && <span className="block font-semibold text-sm text-center mb-1">{cellData.displayText}</span>}
+                                   {itemType === 'device' && cellData.bookingEntries.length > 0 && <span className="block font-semibold text-sm text-center mb-1">{cellData.displayText}</span>}
+                                   <ul className="space-y-0.5">
+                                    {cellData.bookingEntries.map(entry => (
+                                        <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold text-primary")}>
+                                            <span className="font-medium">{entry.itemName}</span> by {getLastName(entry.bookedBy)}
+                                            {itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
+                                            {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
+                                            {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                            {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
+                                        </li>
+                                    ))}
+                                    </ul>
+                                </div>
                             ) : (cellData.status === 'available' && !cellData.isPast) ? (
                                 <div className={cn("flex-grow flex flex-col items-center justify-center", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
                                     <span className={cn("font-medium text-xs", 
-                                      (selectedItemId !== ALL_ITEMS_ID && (cellData.displayText?.startsWith("Available") || cellData.displayText === "No Devices") ) ? "text-primary" : "text-muted-foreground"
+                                      ( (selectedItemId !== ALL_ITEMS_ID && (cellData.displayText?.startsWith("Available") || cellData.displayText === "No Devices") ) || (selectedItemId === ALL_ITEMS_ID && cellData.displayText?.includes("Available"))) ? "text-primary" : "text-muted-foreground"
                                     )}>
                                       {cellData.displayText}
                                     </span>
-                                </div>
-                            ) : (cellData.status === 'partially-booked' || cellData.status === 'all-booked' ) && !cellData.isPast && selectedItemId === ALL_ITEMS_ID ? ( 
-                                <div className="flex-grow flex flex-col items-center justify-center">
-                                     <span className={cn(
-                                      "text-xs font-medium",
-                                      cellData.status === 'partially-booked' ? "text-sky-700" :
-                                      cellData.status === 'all-booked' ? "text-red-700" :
-                                      "text-muted-foreground"
-                                    )}>
-                                        {cellData.displayText}
-                                    </span>
-                                </div>
-                            ) : (cellData.isPast && cellData.status === 'past-booked' && cellData.bookingEntries && cellData.bookingEntries.length > 0 ) ? (
-                                <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight opacity-60")}>
-                                     <span className={cn("block font-semibold text-sm", currentItemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
-                                     <ul className="space-y-0.5">
-                                      {cellData.bookingEntries.map(entry => (
-                                        <li key={entry.reservationId} className="pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0">
-                                          {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                          {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
-                                          {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                          {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
-                                        </li>
-                                      ))}
-                                    </ul>
                                 </div>
                             ) : (cellData.isPast && (cellData.status === 'past-available' || !cellData.displayText)) ? (
                                  <div className="flex-grow flex flex-col items-center justify-center">  </div>
@@ -1172,4 +1179,3 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
-
