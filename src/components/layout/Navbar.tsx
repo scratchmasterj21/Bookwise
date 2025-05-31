@@ -24,7 +24,7 @@ export default function Navbar() {
       <div className="max-w-screen-2xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors">
           <Building className="h-7 w-7" />
-          <h1 className="text-2xl font-headline font-bold">Bookwise</h1>
+          <h1 className="text-2xl font-headline font-bold">Deskspace</h1>
         </Link>
         
         <nav className="flex items-center gap-4">

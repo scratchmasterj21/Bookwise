@@ -6,7 +6,7 @@ import AppProviders from '@/components/providers/AppProviders';
 import Navbar from '@/components/layout/Navbar';
 
 export const metadata: Metadata = {
-  title: 'Bookwise',
+  title: 'Deskspace',
   description: 'Seamlessly reserve devices and rooms.',
 };
 
