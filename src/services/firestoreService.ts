@@ -14,7 +14,6 @@ import {
   QueryDocumentSnapshot,
   FirestoreDataConverter,
   DocumentSnapshot,
-  orderBy,
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -109,7 +108,7 @@ const deviceConverter: FirestoreDataConverter<Device> = {
 };
 
 const reservationConverter: FirestoreDataConverter<Reservation> = {
-  toFirestore(reservation: Omit<Reservation, 'id'>): DocumentData {
+  toFirestore(reservation: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'>): DocumentData {
     const data: DocumentData = {
       userId: reservation.userId,
       itemId: reservation.itemId,
@@ -117,13 +116,24 @@ const reservationConverter: FirestoreDataConverter<Reservation> = {
       startTime: Timestamp.fromDate(new Date(reservation.startTime)),
       endTime: Timestamp.fromDate(new Date(reservation.endTime)),
       status: reservation.status,
+      updatedAt: serverTimestamp() 
     };
     if (reservation.userName) data.userName = reservation.userName;
     if (reservation.userEmail) data.userEmail = reservation.userEmail;
     if (reservation.itemName) data.itemName = reservation.itemName;
     if (reservation.notes) data.notes = reservation.notes;
     if (reservation.purpose) data.purpose = reservation.purpose;
+    if (reservation.devicePurposes) data.devicePurposes = reservation.devicePurposes;
     if (reservation.bookedBy) data.bookedBy = reservation.bookedBy;
+    
+    // Add createdAt only if it's a new document (not an update)
+    // This logic is typically handled by how you call addDoc vs updateDoc
+    // For simplicity, we assume if an ID isn't present, it's new.
+    // However, since this converter takes Omit<Reservation, 'id'>, 
+    // this check is more illustrative.
+    // The actual creation of createdAt is done on addReservation.
+    // data.createdAt = serverTimestamp(); // Set on add, not necessarily in converter for update
+
     return data;
   },
   fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Reservation {
@@ -133,6 +143,8 @@ const reservationConverter: FirestoreDataConverter<Reservation> = {
       ...data,
       startTime: (data.startTime as Timestamp).toDate(),
       endTime: (data.endTime as Timestamp).toDate(),
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
     } as Reservation;
   }
 };
@@ -222,9 +234,15 @@ export const deleteDevice = async (deviceId: string): Promise<void> => {
 };
 
 // --- Reservation Operations ---
-export const addReservation = async (reservationData: Omit<Reservation, 'id'>): Promise<Reservation> => {
+export const addReservation = async (reservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'>): Promise<Reservation> => {
   const reservationsCol = collection(db, 'reservations').withConverter(reservationConverter);
-  const docRef = await addDoc(reservationsCol, reservationData);
+  // Add createdAt and updatedAt during creation
+  const dataWithTimestamps = {
+    ...reservationData,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  const docRef = await addDoc(reservationsCol, dataWithTimestamps as any); // Cast to any to satisfy converter temporarily
   const newDocSnap = await getDoc(docRef.withConverter(reservationConverter));
   if (!newDocSnap.exists()) {
     throw new Error("Failed to create and retrieve reservation");
@@ -247,20 +265,26 @@ export const getReservations = async (userId?: string, itemId?: string): Promise
   } else {
       q = query(collection(db, 'reservations'));
   }
-  // q = query(q, orderBy('startTime', 'desc')); // Removed default sort to allow page-specific sorting
   const snapshot = await getDocs(q.withConverter(reservationConverter));
   return snapshot.docs.map(doc => doc.data());
 };
 
 export const updateReservationStatus = async (reservationId: string, status: Reservation['status']): Promise<void> => {
   const reservationRef = doc(db, 'reservations', reservationId);
-  await updateDoc(reservationRef, { status });
+  await updateDoc(reservationRef, { status, updatedAt: serverTimestamp() });
 };
 
 export const updateReservationPurpose = async (reservationId: string, purpose: string): Promise<void> => {
   const reservationRef = doc(db, 'reservations', reservationId);
-  await updateDoc(reservationRef, { purpose });
+  await updateDoc(reservationRef, { purpose, updatedAt: serverTimestamp() });
 };
+
+// Generic update function for reservations
+export const updateReservation = async (reservationId: string, dataToUpdate: Partial<Omit<Reservation, 'id' | 'createdAt'>>): Promise<void> => {
+  const reservationRef = doc(db, 'reservations', reservationId).withConverter(reservationConverter);
+  await updateDoc(reservationRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
+};
+
 
 export const cancelReservation = async (reservationId: string): Promise<void> => {
   await updateReservationStatus(reservationId, 'cancelled');

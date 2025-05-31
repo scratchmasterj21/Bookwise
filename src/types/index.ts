@@ -53,24 +53,27 @@ export interface Reservation {
   userId: string;
   userName?: string;
   userEmail?: string;
-  itemId: string; // This will be roomId for room reservations
-  itemName?: string; // Room name
+  itemId: string; 
+  itemName?: string; 
   itemType: 'device' | 'room';
   startTime: Date;
   endTime: Date;
   status: ReservationStatus;
-  notes?: string;
-  purpose?: string;
-  bookedBy?: string; // Name/email of the person who made the booking (could be user or admin)
+  notes?: string; // For room details/notes OR device specific notes
+  purpose?: string; // For room's single purpose string
+  devicePurposes?: string[]; // For device's multi-select purposes
+  bookedBy?: string; 
+  createdAt?: Date | any; 
+  updatedAt?: Date | any;
 }
 
-export type ReservationRequest = Omit<Reservation, 'id' | 'userId' | 'userName' | 'userEmail' | 'status'> & {
+export type ReservationRequest = Omit<Reservation, 'id' | 'userId' | 'userName' | 'userEmail' | 'status' | 'createdAt' | 'updatedAt'> & {
   userId?: string;
 };
 
 export interface TimePeriod {
   name: string;
   label: string;
-  start: string; // e.g., "09:00"
-  end: string;   // e.g., "09:45"
+  start: string; 
+  end: string;   
 }

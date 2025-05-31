@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
+import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservation, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
 import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from "@/components/ui/button";
@@ -60,14 +60,15 @@ export default function BookDeviceDailyPage() {
     itemName: string;
     startTime: Date;
     endTime: Date;
-    purpose: string; // notes
+    devicePurposes?: string[];
+    notes?: string;
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
       throw new Error("User not logged in"); 
     }
     setIsProcessingGlobal(true);
-    const newReservationData: Omit<Reservation, 'id'> = {
+    const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
       userId: user.uid,
       userName: user.displayName || user.email || "User",
       userEmail: user.email || undefined,
@@ -77,7 +78,8 @@ export default function BookDeviceDailyPage() {
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
       status: 'approved', 
-      purpose: bookingDetails.purpose, // notes
+      devicePurposes: bookingDetails.devicePurposes,
+      notes: bookingDetails.notes,
       bookedBy: user.displayName || user.email || "User",
     };
 
@@ -86,7 +88,7 @@ export default function BookDeviceDailyPage() {
       setReservations(prev => [...prev, addedReservation]); 
       toast({
         title: 'Device Booked!',
-        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Notes: ${bookingDetails.purpose}`,
+        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}.`,
       });
     } catch (error) {
        console.error("Error creating device reservation:", error);
@@ -97,20 +99,20 @@ export default function BookDeviceDailyPage() {
     }
   };
 
-  const handleUpdateSlot = async (reservationId: string, newNotes: string) => {
+  const handleUpdateSlot = async (reservationId: string, newDetails: { devicePurposes?: string[], notes?: string }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
       throw new Error("User not logged in");
     }
     setIsProcessingGlobal(true);
     try {
-      await updateReservationPurpose(reservationId, newNotes); // 'purpose' field stores notes
+      await updateReservation(reservationId, newDetails); 
       setReservations(prev => 
-        prev.map(res => res.id === reservationId ? { ...res, purpose: newNotes } : res)
+        prev.map(res => res.id === reservationId ? { ...res, ...newDetails } : res)
       );
       toast({
         title: 'Booking Updated!',
-        description: `Booking notes have been updated.`,
+        description: `Booking details have been updated.`,
       });
     } catch (error) {
       console.error("Error updating device reservation:", error);
@@ -197,16 +199,16 @@ export default function BookDeviceDailyPage() {
       ) : (
         <DailyBookingTable 
           selectedDate={selectedDate}
-          items={devices} // Pass devices
-          itemType="device" // Specify itemType
+          items={devices} 
+          itemType="device" 
           reservations={reservations}
-          onBookSlot={handleBookSlot}
-          onUpdateSlot={handleUpdateSlot}
+          onBookSlot={handleBookSlot as any}
+          onUpdateSlot={handleUpdateSlot as any}
           onDeleteSlot={handleDeleteSlotRequest}
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
           itemDisplayName="Device"
-          bookingModalPurposeLabel="Notes for Booking (optional)"
+          bookingModalPurposeLabel="Additional Notes (optional)"
         />
       )}
 

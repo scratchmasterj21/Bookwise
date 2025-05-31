@@ -1,5 +1,5 @@
 
-import type { TimePeriod } from '@/types';
+import type { TimePeriod, DeviceType } from '@/types';
 
 export const TIME_PERIODS: TimePeriod[] = [
   { name: '1st Period', label: '09:00 - 09:45', start: '09:00', end: '09:45' },
@@ -11,11 +11,22 @@ export const TIME_PERIODS: TimePeriod[] = [
   { name: '6th Period', label: '14:15 - 15:00', start: '14:15', end: '15:00' },
 ];
 
-// Device Icons mapping or other shared constants can go here if needed.
-export const DEVICE_TYPES_WITH_ICONS = {
+export const DEVICE_TYPES_WITH_ICONS: Record<DeviceType | 'Other', string> = {
   Laptop: 'Laptop',
   Tablet: 'Tablet',
   Monitor: 'Monitor',
   Projector: 'Tv', // Using Tv for Projector from lucide
   Other: 'Package',
 };
+
+export const DEVICE_PURPOSE_OPTIONS: string[] = [
+  "Boom Cards", "Canva",
+  "Clubs", "Computer Class",
+  "G1 i-Ready Test", "G2 i-Ready Test",
+  "G3 i-Ready Test", "G4 i-Ready Test",
+  "G5 i-Ready Test", "G6 i-Ready Test",
+  "I-ready", "Kahoot",
+  "Kids A-Z", "Others",
+  "Reach Post Test", "Reach Pre Test",
+  "Research", "Youtube"
+];

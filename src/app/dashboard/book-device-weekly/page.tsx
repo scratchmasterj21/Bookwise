@@ -2,13 +2,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import WeeklyBookingCalendar from '@/components/reservations/WeeklyBookingCalendar'; // Re-using, but will adapt its props
+import WeeklyBookingCalendar from '@/components/reservations/WeeklyBookingCalendar'; 
 import type { Device, Reservation } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
+import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservation, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
 import { Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TIME_PERIODS } from '@/lib/constants';
@@ -28,10 +28,10 @@ export default function BookDeviceWeeklyPage() {
     setIsLoading(true);
     try {
       const [fetchedDevices, fetchedReservations] = await Promise.all([
-        fetchDevicesFromDB(), // Fetches all devices
+        fetchDevicesFromDB(), 
         fetchReservationsFromDB() 
       ]);
-      // Filter devices that are available for booking (e.g., status 'available', positive quantity)
+      
       const bookableDevices = fetchedDevices.filter(device => device.status === 'available' && device.quantity > 0);
       setDevices(bookableDevices); 
       setReservations(fetchedReservations.filter(r => r.itemType === 'device'));
@@ -52,18 +52,19 @@ export default function BookDeviceWeeklyPage() {
   }, [authLoading, fetchData]);
 
   const handleBookSlot = async (bookingDetails: {
-    itemId: string; // Changed from roomId to itemId
-    itemName: string; // Changed from roomName to itemName
+    itemId: string; 
+    itemName: string; 
     startTime: Date;
     endTime: Date;
-    purpose: string; // Will be used as notes
+    devicePurposes?: string[]; 
+    notes?: string; 
   }) => {
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
       throw new Error("User not logged in"); 
     }
     setIsProcessingGlobal(true);
-    const newReservationData: Omit<Reservation, 'id'> = {
+    const newReservationData: Omit<Reservation, 'id' | 'createdAt' | 'updatedAt'> = {
       userId: user.uid,
       userName: user.displayName || user.email || "User",
       userEmail: user.email || undefined,
@@ -72,8 +73,9 @@ export default function BookDeviceWeeklyPage() {
       itemType: 'device', 
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
-      status: 'approved', // Or 'pending' if approval is needed
-      purpose: bookingDetails.purpose, // Using purpose as notes
+      status: 'approved', 
+      devicePurposes: bookingDetails.devicePurposes,
+      notes: bookingDetails.notes,
       bookedBy: user.displayName || user.email || "User",
     };
 
@@ -82,7 +84,7 @@ export default function BookDeviceWeeklyPage() {
       setReservations(prev => [...prev, addedReservation]); 
       toast({
         title: 'Device Booked!',
-        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Notes: ${bookingDetails.purpose}`,
+        description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}.`,
       });
     } catch (error) {
        console.error("Error creating device reservation:", error);
@@ -93,21 +95,20 @@ export default function BookDeviceWeeklyPage() {
     }
   };
 
-  const handleUpdateSlot = async (reservationId: string, newNotes: string) => { // Changed newPurpose to newNotes
+  const handleUpdateSlot = async (reservationId: string, newDetails: { devicePurposes?: string[], notes?: string }) => { 
     if (!user) {
       toast({ title: "Not Logged In", description: "You need to be logged in to update bookings.", variant: "destructive" });
       throw new Error("User not logged in");
     }
     setIsProcessingGlobal(true);
     try {
-      // updateReservationPurpose can be used, as it updates the 'purpose' field which we are using for notes
-      await updateReservationPurpose(reservationId, newNotes); 
+      await updateReservation(reservationId, newDetails); 
       setReservations(prev => 
-        prev.map(res => res.id === reservationId ? { ...res, purpose: newNotes } : res)
+        prev.map(res => res.id === reservationId ? { ...res, ...newDetails } : res)
       );
       toast({
         title: 'Booking Updated!',
-        description: `Booking notes have been updated.`,
+        description: `Booking details have been updated.`,
       });
     } catch (error) {
       console.error("Error updating device reservation:", error);
@@ -163,16 +164,16 @@ export default function BookDeviceWeeklyPage() {
         </p>
       ) : (
         <WeeklyBookingCalendar 
-          items={devices} // Pass devices here
-          itemType="device" // Specify itemType
+          items={devices} 
+          itemType="device" 
           reservations={reservations}
-          onBookSlot={handleBookSlot as any} // Cast for now, will refine WeeklyBookingCalendar props
-          onUpdateSlot={handleUpdateSlot}
+          onBookSlot={handleBookSlot as any} 
+          onUpdateSlot={handleUpdateSlot as any}
           onDeleteSlot={handleDeleteSlot}
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
-          itemDisplayName="Device" // New prop to customize display names
-          bookingModalPurposeLabel="Notes for Booking (optional)" // New prop
+          itemDisplayName="Device" 
+          bookingModalPurposeLabel="Additional Notes (optional)"
         />
       )}
 
