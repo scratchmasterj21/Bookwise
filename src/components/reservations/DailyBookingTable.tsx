@@ -413,7 +413,7 @@ export default function DailyBookingTable({
     if (cellData.isPast) {
       if(cellData.bookingEntries && cellData.bookingEntries.length > 0) {
         const description = itemType === 'device'
-            ? cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})${be.devicePurposes && be.devicePurposes.length > 0 ? ` - ↳ ${be.devicePurposes.join(', ')}` : ''}${be.notes ? ` - ↳ Notes: ${be.notes}`:''}`).join('; ')
+            ? cellData.bookingEntries.map(be => `${getLastName(be.bookedBy)} (Qty: ${be.bookedQuantity})${be.devicePurposes && be.devicePurposes.length > 0 ? ` - Purposes: ${be.devicePurposes.join(', ')}` : ''}${be.notes ? ` - Notes: ${be.notes}`:''}`).join('; ')
             : `${getLastName(cellData.bookingEntries[0].bookedBy)} - ${cellData.bookingEntries[0].purpose}`;
         toast({
             title: `Past Booking (${cellData.bookingEntries[0].itemName || itemDisplayName})`,
@@ -429,7 +429,7 @@ export default function DailyBookingTable({
         if (isAdmin || cellData.mainReservation.userId === user?.uid) {
              handleSlotAction(item, period, 'edit', cellData.mainReservation);
         } else { 
-            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - ↳ ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ↳ ${be.purpose}` : ''}`).join('; ');
+            const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - Purposes: ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ${be.purpose}` : ''}`).join('; ');
             toast({ title: "Booking Details", description: `${item.name}: ${bookingDetailsString}` });
         }
     } else if (cellData.status === 'available' || (cellData.status === 'booked' && itemType === 'device')) { 
@@ -460,7 +460,7 @@ export default function DailyBookingTable({
     if (isSlotProcessing || isProcessingGlobal) return true;
     if (itemType === 'room') {
         if (!bookingPurpose.trim()) return true;
-    } else { // device
+    } else { 
         if (selectedDevicePurposes.length === 0) return true;
         if (bookingQuantity < 1) return true;
         const maxQty = getMaxBookableQuantity();
@@ -660,16 +660,16 @@ export default function DailyBookingTable({
                             )}
                           { (cellData.status === 'booked' || cellData.status === 'all-booked') && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                              <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
-                                <span className={cn("block font-semibold text-sm", itemStyling.textClass)}>
+                                <div className={cn("block font-semibold text-sm", itemStyling.textClass)}>
                                   {cellData.bookingEntries[0].itemName}
-                                </span>
+                                </div>
                                 <ul className="space-y-0.5">
                                   {cellData.bookingEntries.map(entry => (
-                                    <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
-                                      {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                      {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
-                                      {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                      {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
+                                    <li key={entry.reservationId} className={cn("pb-1 mb-1 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
+                                      <div className={cn(entry.isCurrentUserBooking && "text-primary")}>{getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}</div>
+                                      {itemType === 'room' && entry.purpose && <div className="text-slate-600 text-[10px]">{entry.purpose}</div>}
+                                      {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600 text-[10px]">{entry.devicePurposes.join(', ')}</div>}
+                                      {itemType === 'device' && entry.notes && <div className="text-slate-500 text-[10px]">Notes: {entry.notes}</div>}
                                     </li>
                                   ))}
                                 </ul>
@@ -686,14 +686,14 @@ export default function DailyBookingTable({
                               </div>
                           ) : cellData.isPast && cellData.status === 'past-booked' && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                               <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight opacity-60")}>
-                                  <span className={cn("block font-semibold text-sm", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
+                                  <div className={cn("block font-semibold text-sm", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</div>
                                   <ul className="space-y-0.5">
                                     {cellData.bookingEntries.map(entry => (
-                                      <li key={entry.reservationId} className="pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0">
-                                        {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
-                                        {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
-                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
-                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[10px] pl-2">↳ Notes: {entry.notes}</span>}
+                                      <li key={entry.reservationId} className="pb-1 mb-1 border-b border-slate-200 last:border-b-0">
+                                        <div className={cn(entry.isCurrentUserBooking && "text-primary")}>{getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}</div>
+                                        {itemType === 'room' && entry.purpose && <div className="text-slate-600 text-[10px]">{entry.purpose}</div>}
+                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600 text-[10px]">{entry.devicePurposes.join(', ')}</div>}
+                                        {itemType === 'device' && entry.notes && <div className="text-slate-500 text-[10px]">Notes: {entry.notes}</div>}
                                       </li>
                                     ))}
                                   </ul>
