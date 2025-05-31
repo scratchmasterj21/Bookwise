@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -7,7 +6,7 @@ import type { Device, Reservation, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservation, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
 import { Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -23,7 +22,7 @@ export default function BookDeviceWeeklyPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
-  const [calendarKey, setCalendarKey] = useState(Date.now()); // Used to force re-render/reset of child
+  const [calendarKey, setCalendarKey] = useState(Date.now()); 
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -106,7 +105,6 @@ export default function BookDeviceWeeklyPage() {
     setIsProcessingGlobal(true);
     try {
       await updateReservation(reservationId, newDetails);
-      // Refetch or update locally for better UX
       const updatedReservations = reservations.map(res => 
         res.id === reservationId ? { ...res, ...newDetails, bookedQuantity: newDetails.bookedQuantity || res.bookedQuantity } : res
       );
@@ -203,7 +201,7 @@ export default function BookDeviceWeeklyPage() {
        toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed. Please try again.`, variant: "destructive" });
     }
     
-    setCalendarKey(Date.now()); // Force re-render to reset multi-select mode in child
+    setCalendarKey(Date.now()); 
     setIsProcessingGlobal(false);
   };
 
@@ -212,7 +210,7 @@ export default function BookDeviceWeeklyPage() {
      return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-1/3 mb-4" />
-          <Skeleton className="h-12 w-1/3 mb-2" />
+          <Skeleton className="h-12 w-full mb-2" /> 
           <Skeleton className="h-[500px] w-full" />
         </div>
     );
@@ -231,7 +229,7 @@ export default function BookDeviceWeeklyPage() {
         </p>
       ) : (
         <WeeklyBookingCalendar
-          key={calendarKey} // To allow resetting child state
+          key={calendarKey} 
           items={devices}
           itemType="device"
           reservations={reservations}
@@ -265,5 +263,3 @@ export default function BookDeviceWeeklyPage() {
     </div>
   );
 }
-
-    
