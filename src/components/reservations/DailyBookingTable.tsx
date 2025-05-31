@@ -458,8 +458,9 @@ export default function DailyBookingTable({
 
   const isBookingButtonDisabled = () => {
     if (isSlotProcessing || isProcessingGlobal) return true;
-    if (itemType === 'room' && !bookingPurpose.trim()) return true;
-    if (itemType === 'device') {
+    if (itemType === 'room') {
+        if (!bookingPurpose.trim()) return true;
+    } else { // device
         if (selectedDevicePurposes.length === 0) return true;
         if (bookingQuantity < 1) return true;
         const maxQty = getMaxBookableQuantity();
@@ -665,7 +666,7 @@ export default function DailyBookingTable({
                                 <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
                                   <ul className="space-y-0.5">
                                     {cellData.bookingEntries.map(entry => (
-                                      <li key={entry.reservationId} className={cn(entry.isCurrentUserBooking && "font-semibold text-primary")}>
+                                      <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
                                         {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
                                         {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
                                         {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
@@ -690,7 +691,7 @@ export default function DailyBookingTable({
                                   <span className={cn("block font-semibold text-sm", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
                                   <ul className="space-y-0.5">
                                     {cellData.bookingEntries.map(entry => (
-                                      <li key={entry.reservationId}>
+                                      <li key={entry.reservationId} className="pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0">
                                         {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
                                         {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
                                         {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}

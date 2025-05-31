@@ -596,8 +596,9 @@ export default function WeeklyBookingCalendar({
 
     if (!itemForModal && !editingReservationId) return true; 
 
-    if (itemType === 'room' && !bookingPurpose.trim()) return true;
-    if (itemType === 'device') {
+    if (itemType === 'room') {
+        if (!bookingPurpose.trim()) return true;
+    } else { // device
       if (selectedDevicePurposes.length === 0) return true;
       if (bookingQuantity < 1) return true; 
       
@@ -759,7 +760,8 @@ export default function WeeklyBookingCalendar({
       <CardContent className="p-0">
         {items.length > 0 || selectedItemId === ALL_ITEMS_ID ? ( 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm min-w-[1020px]"><thead>
+            <table className="w-full border-collapse text-sm min-w-[1020px]">
+              <thead>
                 <tr className="bg-muted">
                   <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-middle h-16 min-w-[120px] sm:min-w-[150px]">Period</th>
                   {weekDays.map(day => (
@@ -829,7 +831,7 @@ export default function WeeklyBookingCalendar({
                                   <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
                                     <ul className="space-y-0.5">
                                       {cellData.bookingEntries.map(entry => (
-                                        <li key={entry.reservationId} className={cn(entry.isCurrentUserBooking && "font-semibold text-primary")}>
+                                        <li key={entry.reservationId} className={cn("pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0",entry.isCurrentUserBooking && "font-semibold text-primary")}>
                                           {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
                                           {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
                                           {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
@@ -869,7 +871,7 @@ export default function WeeklyBookingCalendar({
                                      <span className={cn("block font-semibold text-sm", currentItemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
                                      <ul className="space-y-0.5">
                                       {cellData.bookingEntries.map(entry => (
-                                        <li key={entry.reservationId}>
+                                        <li key={entry.reservationId} className="pb-0.5 mb-0.5 border-b border-slate-200 last:border-b-0">
                                           {getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}
                                           {itemType === 'room' && entry.purpose && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.purpose}</span>}
                                           {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[10px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
@@ -1172,3 +1174,4 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
+
