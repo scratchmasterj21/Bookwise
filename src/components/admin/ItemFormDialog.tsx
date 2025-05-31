@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -18,14 +19,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Device, Room, Building, DeviceType } from '@/types';
 import { Loader2 } from 'lucide-react';
 
-type Item = Partial<Device | Room | Building>;
+type Item = Partial<Device | Room | Building>; // This can include 'id' for editing
+type ItemCreationData = Omit<Device, 'id'> | Omit<Room, 'id'> | Omit<Building, 'id'>; // For new items, 'id' is omitted
 type ItemType = 'device' | 'room' | 'building';
 
 interface ItemFormDialogProps {
   itemType: ItemType;
   itemData?: Item | null;
   triggerButton?: React.ReactNode;
-  onSave: (itemData: Item) => Promise<void>;
+  onSave: (itemData: Item | ItemCreationData) => Promise<void>; // Modified to accept both types
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   buildings?: Building[];
@@ -72,11 +74,8 @@ export default function ItemFormDialog({
     : [];
 
   useEffect(() => {
-    // This effect handles the general form reset and population based on itemData and itemType.
-    // It should not be sensitive to `allRooms` changing for non-device types or for field initializations
-    // that don't depend on `allRooms`.
     if (open) {
-        if (itemData) { // Editing existing item
+        if (itemData) { 
             setName(itemData.name || '');
             setImageUrl(itemData.imageUrl || '');
 
@@ -97,9 +96,8 @@ export default function ItemFormDialog({
                 setStatus(d.status || 'available');
                 setSpecificType(d.type || '');
                 setSelectedBuildingId(d.buildingId || undefined);
-                // Room selection logic for devices is handled below, potentially based on allRooms
             }
-        } else { // Reset form for new item
+        } else { 
             setName('');
             setDescription('');
             setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
@@ -113,18 +111,12 @@ export default function ItemFormDialog({
             setSelectedRoomId(undefined);
         }
     }
-  }, [open, itemData, itemType]); // Key dependencies: open, itemData, itemType
+  }, [open, itemData, itemType]); 
 
   useEffect(() => {
-    // This effect specifically handles initializing/updating selectedRoomId for devices,
-    // especially if allRooms data changes or buildingId changes for an existing device,
-    // or when a building is selected for a new device.
     if (open && itemType === 'device') {
-        if (itemData && itemData.id) { // Editing a device
+        if (itemData && itemData.id) { 
             const d = itemData as Device;
-            // If buildingId of the device matches the currently selected one,
-            // or if selectedBuildingId is not yet set (initial load of edit form),
-            // try to set the room.
             if (d.buildingId === selectedBuildingId || !selectedBuildingId) {
               const currentBuildingRooms = d.buildingId ? allRooms.filter(room => room.buildingId === d.buildingId) : [];
               if (d.roomId && currentBuildingRooms.find(r => r.id === d.roomId)) {
@@ -133,15 +125,8 @@ export default function ItemFormDialog({
                   setSelectedRoomId(undefined); 
               }
             } else {
-              // If selectedBuildingId has changed (user picked a new building while editing a device),
-              // reset the room.
               setSelectedRoomId(undefined);
             }
-        } else { // Adding a new device or selectedBuildingId changed
-            // selectedRoomId is reset if selectedBuildingId changes (handled in its Select's onValueChange)
-            // or by the general effect when resetting the form.
-            // This effect mainly ensures that if allRooms data itself changes for devices,
-            // the availableRoomsInSelectedBuilding list is up-to-date.
         }
     }
   }, [open, itemData, itemType, selectedBuildingId, allRooms]);
@@ -151,48 +136,61 @@ export default function ItemFormDialog({
     e.preventDefault();
     setIsSaving(true);
     
-    const baseData: Partial<Building | Room | Device> & { name: string; imageUrl?: string; id?: string } = {
-      id: itemData?.id || undefined,
+    let dataFields: Omit<Building, 'id'> | Omit<Room, 'id'> | Omit<Device, 'id'> = {
       name,
-      imageUrl: imageUrl || undefined, // Send undefined if empty, so Firestore can delete field if needed
-    };
-
-
-    let finalData: Item;
+      imageUrl: imageUrl || undefined,
+    } as any; // Base fields, will be narrowed down
 
     if (itemType === 'building') {
-      finalData = { ...baseData, location, notes } as Building;
+      dataFields = {
+        ...dataFields,
+        name, // Ensure name is explicitly included if not in the base spread
+        location,
+        notes,
+      } as Omit<Building, 'id'>;
     } else if (itemType === 'room') {
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
-      finalData = { 
-        ...baseData, 
-        description, 
-        status, 
-        capacity, 
+      dataFields = {
+        ...dataFields,
+        name,
+        description,
+        status,
+        capacity,
         amenities: amenities.split(',').map(a => a.trim()).filter(a => a),
         buildingId: selectedBuildingId,
         buildingName: selectedBuilding?.name,
-      } as Room;
+        category: (itemData as Room)?.category || '', // Retain category if it exists
+      } as Omit<Room, 'id'>;
     } else { // device
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const selectedRoom = allRooms.find(r => r.id === selectedRoomId);
-      finalData = { 
-        ...baseData, 
-        description, 
-        status, 
+      dataFields = {
+        ...dataFields,
+        name,
+        description,
+        status,
         type: specificType as DeviceType,
         buildingId: selectedBuildingId,
         buildingName: selectedBuilding?.name,
         roomId: selectedRoomId,
         roomName: selectedRoom?.name,
-      } as Device;
+      } as Omit<Device, 'id'>;
+    }
+    
+    let finalPayload: Item | ItemCreationData;
+
+    if (isEditing && itemData?.id) {
+      finalPayload = { ...dataFields, id: itemData.id } as Item; // Add id only if editing
+    } else {
+      finalPayload = dataFields; // No id if creating (already Omit<Item, 'id'> type)
     }
     
     try {
-      await onSave(finalData);
+      await onSave(finalPayload);
       onOpenChange(false); 
     } catch (error) {
       console.error(`Error during ${itemType} save operation in dialog:`, error);
+      // Toast for error is usually handled in the page calling onSave
     } finally {
       setIsSaving(false);
     }
@@ -331,3 +329,5 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
+
+    
