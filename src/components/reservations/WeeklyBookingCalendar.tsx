@@ -69,7 +69,7 @@ const getRoomStyling = (roomName?: string): RoomStyling => {
   if (lowerRoomName.includes('multipurpose room')) return { borderClass: 'border-purple-400', textClass: 'text-purple-700' };
   if (lowerRoomName.includes('music')) return { borderClass: 'border-orange-400', textClass: 'text-orange-700' };
   if (lowerRoomName.includes('agape hall')) return { borderClass: 'border-emerald-400', textClass: 'text-emerald-700' };
-  return { borderClass: 'border-amber-400', textClass: 'text-amber-700' };
+  return { borderClass: 'border-amber-400', textClass: 'text-amber-700' }; // Default color
 };
 
 const getLastName = (fullName?: string): string => {
@@ -126,9 +126,10 @@ export default function WeeklyBookingCalendar({
 
     return reservations.filter(res => {
       if (roomId && res.itemId !== roomId) return false;
-      if (res.itemType !== 'room') return false;
+      if (res.itemType !== 'room') return false; // Ensure we are only considering room reservations
       const reservationStart = new Date(res.startTime);
       const reservationEnd = new Date(res.endTime);
+      // Check for overlap and ensure reservation is not cancelled or rejected
       return reservationStart < periodEndDateTime && reservationEnd > periodStartDateTime && res.status !== 'cancelled' && res.status !== 'rejected';
     });
   };
@@ -144,7 +145,7 @@ export default function WeeklyBookingCalendar({
 
     if (actionType === 'edit' && existingReservation) {
       targetRoom = rooms.find(r => r.id === existingReservation.itemId);
-      const canManageBooking = isAdmin || existingReservation.userId === user.uid;
+       const canManageBooking = isAdmin || existingReservation.userId === user.uid;
        if (!canManageBooking) {
         toast({ title: "Permission Denied", description: "You cannot edit this booking.", variant: "destructive"});
         return;
@@ -156,11 +157,11 @@ export default function WeeklyBookingCalendar({
     } else if (actionType === 'book') {
         if (selectedRoomId === ALL_ROOMS_ID) {
              setCurrentBookingSlot({ day, period, room: null }); 
-             setModalSelectedRoomIdForBooking(undefined);
+             setModalSelectedRoomIdForBooking(undefined); // User needs to select a room in the modal
         } else {
              targetRoom = rooms.find(r => r.id === selectedRoomId);
              setCurrentBookingSlot({ day, period, room: targetRoom });
-             setModalSelectedRoomIdForBooking(targetRoom?.id);
+             setModalSelectedRoomIdForBooking(targetRoom?.id); // Room is already selected via dropdown
         }
         setBookingPurpose('');
         setEditingReservationId(null);
@@ -230,7 +231,7 @@ export default function WeeklyBookingCalendar({
 
         if (isPast) {
             if (bookedRoomCount > 0) return { status: 'past-booked-all-view', isPast: true, displayText: `${bookedRoomCount} Room(s) Booked` };
-            return { status: 'past-available', isPast: true, displayText: "Past" };
+            return { status: 'past-available', isPast: true, displayText: "" }; // Display nothing for past available
         }
         if (rooms.length > 0 && bookedRoomCount === rooms.length) {
             return { status: 'all-booked', isPast: false, displayText: "All Rooms Booked" };
@@ -255,7 +256,7 @@ export default function WeeklyBookingCalendar({
             isCurrentUserBooking: mainReservation.userId === user?.uid,
             mainReservation
         };
-        return { status: 'past-available', isPast: true, roomName: roomForSlot?.name, displayText: "Past" };
+        return { status: 'past-available', isPast: true, roomName: roomForSlot?.name, displayText: "" }; // Display nothing for past available
     }
 
     if (mainReservation) {
@@ -275,7 +276,7 @@ export default function WeeklyBookingCalendar({
 
   const getCellClasses = (day: Date, period: TimePeriod) => {
     const cellData = getCellDisplayData(day, period);
-    let baseClasses = "p-1 border align-top h-[75px] relative text-xs group/cell";
+    let baseClasses = "p-0 border align-top h-[75px] relative text-xs group/cell"; // p-0 here
     
     if (isToday(day)) {
         baseClasses = cn(baseClasses, "bg-primary/5");
@@ -286,12 +287,12 @@ export default function WeeklyBookingCalendar({
             const roomStyling = getRoomStyling(cellData.roomName);
             baseClasses = cn(baseClasses, `bg-slate-100 ${roomStyling.borderClass} opacity-60 cursor-default`);
         } else { 
-            baseClasses = cn(baseClasses, "bg-slate-50 border-slate-200 cursor-not-allowed");
+            baseClasses = cn(baseClasses, "bg-slate-50 border-slate-200 cursor-default");
         }
     } else { 
         if (cellData.mainReservation && selectedRoomId !== ALL_ROOMS_ID) {
             const roomStyling = getRoomStyling(cellData.roomName);
-            const backgroundClass = cellData.isCurrentUserBooking ? 'bg-green-50' : 'bg-emerald-50';
+             const backgroundClass = cellData.isCurrentUserBooking ? 'bg-green-50' : 'bg-emerald-50'; // Keeping it subtle green for my bookings
             baseClasses = cn(baseClasses, `${backgroundClass} ${roomStyling.borderClass} border-2`, "cursor-pointer");
         } else if (cellData.status === 'available') {
             baseClasses = cn(baseClasses, "bg-background hover:bg-primary/10 border-slate-200 cursor-pointer transition-colors duration-150");
@@ -314,21 +315,21 @@ export default function WeeklyBookingCalendar({
     if (isProcessingGlobal || isSlotProcessing) return;
 
     if (cellData.isPast) {
-      if(cellData.mainReservation) {
+      if(cellData.mainReservation) { // If it's a past booked slot
         toast({
             title: "Past Booking",
             description: `${cellData.roomName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || 'N/A'}`
         });
-      } else {
-        toast({ title: "Past Slot", description: "This slot cannot be booked or edited."});
+      } else { // If it's a past available slot
+        toast({ title: "Past Slot", description: "This slot cannot be booked."});
       }
       return;
     }
     
-    const canManageBooking = isAdmin || cellData.isCurrentUserBooking;
+    const canManageCurrentBooking = isAdmin || cellData.isCurrentUserBooking;
 
-    if (cellData.mainReservation && selectedRoomId !== ALL_ROOMS_ID) {
-        if (canManageBooking) {
+    if (cellData.mainReservation && selectedRoomId !== ALL_ROOMS_ID) { // Booked slot in single room view
+        if (canManageCurrentBooking) {
             handleSlotAction(day, period, 'edit', cellData.mainReservation);
         } else { 
              toast({
@@ -337,6 +338,7 @@ export default function WeeklyBookingCalendar({
             });
         }
     } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedRoomId === ALL_ROOMS_ID)) {
+        // Available slot (either in single room view or "All Rooms" view where some rooms are available)
         handleSlotAction(day, period, 'book');
     } else if (cellData.status === 'all-booked' && selectedRoomId === ALL_ROOMS_ID) {
         toast({ title: "No Rooms Available", description: "All rooms are booked for this slot.", variant: "default" });
@@ -378,8 +380,8 @@ export default function WeeklyBookingCalendar({
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm min-w-[1020px]">
               <thead>
-                <tr className="bg-muted/60">
-                  <th className="p-2 border-b border-r text-center sticky left-0 bg-muted/95 z-20 font-semibold text-foreground align-top h-12">Period</th>
+                <tr className="bg-muted">
+                  <th className="p-2 border-b border-r text-center sticky left-0 bg-muted z-20 font-semibold text-foreground align-top h-12">Period</th>
                   {weekDays.map(day => (
                     <th key={day.toISOString()} className={cn(
                         "p-2 border-b border-r text-center min-w-[180px] font-semibold text-foreground align-top h-12",
@@ -408,7 +410,7 @@ export default function WeeklyBookingCalendar({
                       return (
                         <td
                           key={slotKey}
-                          className={cn(getCellClasses(day, period), 'align-top p-0')}
+                          className={cn(getCellClasses(day, period), 'align-top')}
                           onClick={() => handleCellClick(day, period)}
                           onMouseEnter={() => setHoveredSlot(slotKey)}
                           onMouseLeave={() => setHoveredSlot(null)}
@@ -428,18 +430,28 @@ export default function WeeklyBookingCalendar({
                                     </span>
                                 </div>
                               </div>
-                            ) : (
+                            ) : (cellData.status === 'available' && selectedRoomId !== ALL_ROOMS_ID && !cellData.isPast) ? (
                                 <div className="flex-grow flex flex-col items-center justify-center">
-                                    <span className={cn(
+                                    <span className="text-primary font-medium text-xs">{cellData.displayText}</span>
+                                </div>
+                            ) : (cellData.status === 'partially-booked' || cellData.status === 'all-booked' || (cellData.status === 'available' && selectedRoomId === ALL_ROOMS_ID)) && !cellData.isPast ? (
+                                <div className="flex-grow flex flex-col items-center justify-center">
+                                     <span className={cn(
                                       "text-xs",
-                                      cellData.isPast ? "text-slate-400" : 
-                                      (cellData.status === 'available' && selectedRoomId !== ALL_ROOMS_ID) ? "text-primary font-medium" :
-                                      (cellData.status === 'partially-booked') ? "text-sky-700" :
-                                      (cellData.status === 'all-booked') ? "text-red-700" :
-                                      "text-muted-foreground"
+                                      cellData.status === 'partially-booked' ? "text-sky-700" :
+                                      cellData.status === 'all-booked' ? "text-red-700" :
+                                      "text-muted-foreground" // For "Available" in all rooms view
                                     )}>
                                         {cellData.displayText}
                                     </span>
+                                </div>
+                            ) : (cellData.isPast && cellData.status !== 'past-booked' && cellData.status !== 'past-booked-all-view') ? (
+                                 <div className="flex-grow flex flex-col items-center justify-center">
+                                    {/* Display nothing for past available slots */}
+                                </div>
+                            ) : (
+                                 <div className="flex-grow flex flex-col items-center justify-center">
+                                     <span className="text-xs text-muted-foreground">{cellData.displayText}</span>
                                 </div>
                             )}
 
