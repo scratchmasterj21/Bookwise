@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -30,7 +29,7 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-[calc(100vh-15rem)] animate-subtle-fade-in">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-headline">Welcome to ReserveIt</CardTitle>
+          <CardTitle className="text-3xl font-headline">Welcome to Bookwise</CardTitle>
           <CardDescription className="leading-relaxed">Sign in to manage your reservations.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center space-y-6 p-8">
