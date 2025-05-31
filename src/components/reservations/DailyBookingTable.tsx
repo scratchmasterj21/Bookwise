@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { Room, Reservation, TimePeriod, Device, DeviceType } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Edit2, Loader2, Trash2, Package, Laptop, Tablet, Monitor as MonitorIcon, Tv as ProjectorIcon, CheckSquare, XSquare } from 'lucide-react';
+import { Edit2, Loader2, Trash2, Package, Laptop, Tablet, Monitor as MonitorIcon, Tv as ProjectorIcon, CheckSquare } from 'lucide-react';
 import {
   format,
   setHours,
@@ -107,7 +107,7 @@ const getItemStyling = (item: Item, itemTypeProp: 'room' | 'device'): ItemStylin
 const getLastName = (fullName?: string): string => {
   if (!fullName) return 'User';
   const parts = fullName.split(' ');
-  return parts.length > 0 ? parts[parts.length - 1] : fullName;
+  return parts.join(' '); // Return full name or last name as per previous logic
 };
 
 const getIconForItemType = (itemTypeProp: 'room' | 'device', deviceDetail?: DeviceType | string): React.ElementType | undefined => {
@@ -158,6 +158,7 @@ interface DailyBookingTableProps {
   isProcessingGlobal?: boolean;
   itemDisplayName?: string;
   bookingModalPurposeLabel?: string;
+  key?: string | number; // Added key prop
 }
 
 
@@ -190,7 +191,6 @@ export default function DailyBookingTable({
   const [editingReservationId, setEditingReservationId] = useState<string | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
-  // Multi-period booking state
   const [isMultiPeriodMode, setIsMultiPeriodMode] = useState(false);
   const [selectedMultiSlots, setSelectedMultiSlots] = useState<Map<string, SelectedMultiSlotInfoDaily>>(new Map());
   const [multiBookModalOpen, setMultiBookModalOpen] = useState(false);
@@ -268,7 +268,7 @@ export default function DailyBookingTable({
       setCurrentBookingSlot({ item, period, existingReservation });
       if (itemType === 'room') {
         setBookingPurpose(existingReservation.purpose || '');
-      } else { // device
+      } else { 
         setSelectedDevicePurposes(existingReservation.devicePurposes || []);
         setBookingNotes(existingReservation.notes || '');
         setBookingQuantity(existingReservation.bookedQuantity || 1);
@@ -472,7 +472,7 @@ export default function DailyBookingTable({
       toast({ title: "Multiple Device Types", description: "Please select periods for only one device type at a time for multi-booking.", variant: "destructive" });
       return;
     }
-    if (deviceIds.size === 0) return; // Should not happen if selectedMultiSlots.size > 0
+    if (deviceIds.size === 0) return; 
 
     const targetDeviceId = Array.from(deviceIds)[0];
     const device = items.find(d => d.id === targetDeviceId) as Device | undefined;
@@ -630,7 +630,6 @@ export default function DailyBookingTable({
                                 <span className={cn("block font-semibold", itemStyling.textClass)}>
                                   {cellData.bookingEntries[0].itemName}
                                 </span>
-                                <span className="font-medium text-muted-foreground">Booked by:</span>
                                 <ScrollArea className="h-[calc(100%-30px)] pr-1"> 
                                   <ul className="space-y-0.5">
                                     {cellData.bookingEntries.map(entry => (
@@ -657,11 +656,12 @@ export default function DailyBookingTable({
                           ) : cellData.isPast && cellData.status === 'past-booked' && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                               <div className={cn("flex flex-col w-full h-full space-y-0.5 text-[10px] leading-tight opacity-60")}>
                                   <span className={cn("block font-semibold", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</span>
-                                  <span className="font-medium text-muted-foreground">Booked by:</span>
                                   <ul className="space-y-0.5">
                                     {cellData.bookingEntries.map(entry => (
                                       <li key={entry.reservationId}>
                                         {getLastName(entry.bookedBy)} (Qty: {entry.bookedQuantity})
+                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <span className="block text-slate-600 text-[9px] pl-2">↳ {entry.devicePurposes.join(', ')}</span>}
+                                        {itemType === 'device' && entry.notes && <span className="block text-slate-500 text-[9px] pl-2">↳ Notes: {entry.notes}</span>}
                                       </li>
                                     ))}
                                   </ul>
@@ -793,7 +793,6 @@ export default function DailyBookingTable({
         </DialogContent>
       </Dialog>
 
-      {/* Multi-Booking Modal for Daily Device View */}
       {itemType === 'device' && multiBookTargetDevice && (
         <Dialog open={multiBookModalOpen} onOpenChange={setMultiBookModalOpen}>
           <DialogContent className="sm:max-w-md">
