@@ -67,7 +67,7 @@ const getRoomStyling = (roomName?: string): RoomStyling => {
   if (lowerRoomName.includes('multipurpose room')) return { borderClass: 'border-purple-500', textClass: 'text-purple-700' };
   if (lowerRoomName.includes('music')) return { borderClass: 'border-orange-500', textClass: 'text-orange-700' };
   if (lowerRoomName.includes('agape hall')) return { borderClass: 'border-emerald-500', textClass: 'text-emerald-700' };
-  return { borderClass: 'border-slate-400', textClass: 'text-slate-700' };
+  return { borderClass: 'border-slate-400', textClass: 'text-slate-600' }; // Default color
 };
 
 const getLastName = (fullName?: string): string => {
@@ -124,9 +124,10 @@ export default function WeeklyBookingCalendar({
 
     return reservations.filter(res => {
       if (roomId && res.itemId !== roomId) return false;
-      if (res.itemType !== 'room') return false;
+      if (res.itemType !== 'room') return false; // Ensure we are only dealing with room reservations
       const reservationStart = new Date(res.startTime);
       const reservationEnd = new Date(res.endTime);
+      // Check for overlap and ensure status is not cancelled or rejected
       return reservationStart < periodEndDateTime && reservationEnd > periodStartDateTime && res.status !== 'cancelled' && res.status !== 'rejected';
     });
   };
@@ -141,6 +142,11 @@ export default function WeeklyBookingCalendar({
     const targetRoom = existingReservation ? rooms.find(r => r.id === existingReservation.itemId) : rooms.find(r => r.id === selectedRoomId);
 
     if (actionType === 'edit' && existingReservation) {
+      // Only admins or the user who booked can edit
+      if (!isAdmin && existingReservation.userId !== user.uid) {
+        toast({ title: "Permission Denied", description: "You cannot edit this booking.", variant: "destructive"});
+        return;
+      }
       setCurrentBookingSlot({ day, period, room: targetRoom, existingReservation });
       setBookingPurpose(existingReservation.purpose || '');
       setEditingReservationId(existingReservation.id);
@@ -235,7 +241,7 @@ export default function WeeklyBookingCalendar({
     }
 
     const reservationsInSlot = getReservationsForSlot(day, period, selectedRoomId);
-    const mainReservation = reservationsInSlot[0];
+    const mainReservation = reservationsInSlot[0]; // Assuming one booking per room per slot
     const roomForSlot = rooms.find(r => r.id === selectedRoomId);
 
     if (isPast) {
@@ -268,12 +274,12 @@ export default function WeeklyBookingCalendar({
 
   const getCellClasses = (day: Date, period: TimePeriod) => {
     const cellData = getCellDisplayData(day, period);
-    let baseClasses = "p-1 border align-top h-[75px] relative text-xs";
     const roomStyling = getRoomStyling(cellData.roomName);
+    let baseClasses = "p-1 border align-top h-[75px] relative text-xs group/cell"; 
 
     if (cellData.isPast) {
       if (cellData.status === 'past-booked') {
-         baseClasses = cn(baseClasses, `bg-slate-100 ${roomStyling.borderClass.replace('border-', 'border-slate-').replace(/[0-9]{3}/, '300')} opacity-70`, "cursor-default");
+         baseClasses = cn(baseClasses, `bg-slate-100 border-slate-300 opacity-70 cursor-default`);
       } else if (cellData.status === 'past-booked-all-view') {
           baseClasses = cn(baseClasses, "bg-slate-100 border-slate-300 opacity-70 cursor-default");
       } else { // past-available
@@ -281,8 +287,8 @@ export default function WeeklyBookingCalendar({
       }
     } else { // Not past
       if (cellData.mainReservation) { // Booked slot
-        const bgClass = cellData.isCurrentUserBooking ? 'bg-green-50' : 'bg-emerald-50';
-        baseClasses = cn(baseClasses, `${bgClass} ${roomStyling.borderClass}`, "cursor-pointer");
+        const backgroundClass = cellData.isCurrentUserBooking ? 'bg-green-50' : 'bg-emerald-50'; // Brighter green for current user
+        baseClasses = cn(baseClasses, `${backgroundClass} ${roomStyling.borderClass}`, "cursor-pointer");
       } else if (cellData.status === 'available') {
         baseClasses = cn(baseClasses, "bg-background hover:bg-green-50 border-slate-200 text-slate-500 cursor-pointer transition-colors duration-150");
       } else if (cellData.status === 'all-booked') {
@@ -312,16 +318,16 @@ export default function WeeklyBookingCalendar({
       return;
     }
 
-    if (cellData.mainReservation) {
+    if (cellData.mainReservation) { // Slot is booked
         const canEditOrDelete = isAdmin || cellData.isCurrentUserBooking;
-        if (canEditOrDelete && selectedRoomId !== ALL_ROOMS_ID) { // Allow click on cell to edit if specific room view
+        if (canEditOrDelete && selectedRoomId !== ALL_ROOMS_ID) { 
             handleSlotAction(day, period, 'edit', cellData.mainReservation);
-        } else if (!canEditOrDelete) { // Non-admin, not their booking
+        } else if (!canEditOrDelete) { 
              toast({
                 title: "Booking Details",
                 description: `${cellData.roomName}: ${getLastName(cellData.bookedBy)} - ${cellData.purpose || 'N/A'}`
             });
-        } else if (selectedRoomId === ALL_ROOMS_ID) {
+        } else if (selectedRoomId === ALL_ROOMS_ID) { // Admin or current user, but in "All Rooms" view
             toast({ title: "View Only", description: "Select a specific room to manage bookings." });
         }
     } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedRoomId === ALL_ROOMS_ID)) {
@@ -381,9 +387,9 @@ export default function WeeklyBookingCalendar({
               <tbody>
                 {periods.map(period => (
                   <tr key={period.name} className="even:bg-background odd:bg-muted/20">
-                    <td className="p-2 border-r text-left sticky left-0 z-10 align-top h-[75px] even:bg-background odd:bg-muted/20">
-                      <div className="font-medium text-foreground text-xs">{period.name}</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">{period.label}</div>
+                    <td className="p-2 border-r text-center sticky left-0 z-10 align-top h-[75px] even:bg-background odd:bg-muted/20">
+                      <div className="font-semibold text-foreground text-sm">{period.name}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{period.label}</div>
                     </td>
                     {weekDays.map(day => {
                       const slotKey = `${day.toISOString()}-${period.name}`;
@@ -391,26 +397,24 @@ export default function WeeklyBookingCalendar({
                       const roomStyling = getRoomStyling(cellData.roomName);
                       
                       const canManageBooking = (isAdmin || cellData.isCurrentUserBooking) && cellData.mainReservation && !cellData.isPast && selectedRoomId !== ALL_ROOMS_ID;
-                      const showAdminActions = hoveredSlot === slotKey && canManageBooking;
+                      const showActions = hoveredSlot === slotKey && canManageBooking;
 
                       return (
                         <td
                           key={slotKey}
-                          className={cn(getCellClasses(day, period), "group/cell")}
+                          className={cn(getCellClasses(day, period))}
                           onClick={() => handleCellClick(day, period)}
                           onMouseEnter={() => setHoveredSlot(slotKey)}
                           onMouseLeave={() => setHoveredSlot(null)}
                         >
                           <div className="p-1.5 h-full flex flex-col relative">
-                            {/* Available Slot */}
+                            {/* Content for the cell based on status */}
                             {cellData.status === 'available' && !cellData.isPast && (
                               <div className="flex-grow flex flex-col items-center justify-center">
                                 <CheckCircle className="h-5 w-5 text-green-500 opacity-70 mb-1" />
                                 <span className="text-[11px] text-green-600 font-medium">Available</span>
                               </div>
                             )}
-
-                            {/* Past Available Slot */}
                             {cellData.status === 'past-available' && cellData.isPast && (
                                <div className="flex-grow flex flex-col items-center justify-center">
                                 <CalendarX className="h-5 w-5 text-slate-400 opacity-60 mb-1" />
@@ -418,14 +422,13 @@ export default function WeeklyBookingCalendar({
                               </div>
                             )}
                             
-                            {/* Booked Slot Content (Specific Room View) */}
                             {cellData.mainReservation && selectedRoomId !== ALL_ROOMS_ID && (
                                <div className={cn("flex flex-col text-left w-full h-full", cellData.isPast ? "opacity-60" : "")}>
                                 <div>
                                     <span className={cn("block font-semibold text-[11px] truncate", roomStyling.textClass)}>
                                         {cellData.roomName}
                                     </span>
-                                    <span className="block font-semibold text-red-600 text-[10px]">
+                                    <span className="block font-semibold text-red-600 text-[10px] leading-tight">
                                         {getLastName(cellData.bookedBy)}
                                     </span>
                                     <span className="block text-slate-700 text-[10px] leading-tight break-words whitespace-normal mt-0.5">
@@ -435,7 +438,6 @@ export default function WeeklyBookingCalendar({
                               </div>
                             )}
 
-                            {/* All Rooms View - Partially/All Booked */}
                             {(cellData.status === 'all-booked' || cellData.status === 'partially-booked' || cellData.status === 'past-booked-all-view') && selectedRoomId === ALL_ROOMS_ID && (
                                 <div className="flex-grow flex flex-col items-center justify-center">
                                     <p className="text-[11px] text-center opacity-90">{cellData.displayText}</p>
@@ -443,7 +445,7 @@ export default function WeeklyBookingCalendar({
                             )}
 
                             {/* Action Buttons */}
-                            {showAdminActions && (
+                            {showActions && (
                                 <div className="absolute top-1 right-1 flex items-center space-x-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity">
                                     <Button
                                       variant="ghost"
@@ -545,3 +547,6 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
+
+
+    
