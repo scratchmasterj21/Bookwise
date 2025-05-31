@@ -15,6 +15,7 @@ export interface Building {
   id: string;
   name: string;
   location?: string;
+  floor?: string; // Added floor field
   notes?: string;
   imageUrl?: string; 
 }
@@ -73,3 +74,4 @@ export interface TimePeriod {
   start: string; 
   end: string;   
 }
+

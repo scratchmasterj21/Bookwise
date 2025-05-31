@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv } from 'lucide-react'; // Added BuildingIcon
+import { Trash2, Edit3, Laptop, DoorOpen, Package, Warehouse, Tablet, Monitor as MonitorIcon, Tv, Layers } from 'lucide-react'; // Added Layers for Floor
 import Image from 'next/image';
 import { Badge } from '../ui/badge';
 
@@ -63,6 +63,7 @@ export default function ItemManagementTable({
           <TableHead>Image</TableHead>
           <TableHead>Name</TableHead>
           <TableHead>Location</TableHead>
+          <TableHead>Floor</TableHead> {/* Added Floor header */}
           <TableHead>Notes</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -120,6 +121,7 @@ export default function ItemManagementTable({
           {commonImageCell}
           <TableCell className="font-medium">{b.name}</TableCell>
           <TableCell>{b.location || 'N/A'}</TableCell>
+          <TableCell>{b.floor || 'N/A'}</TableCell> {/* Added Floor cell */}
           <TableCell className="truncate max-w-xs">{b.notes || 'N/A'}</TableCell>
           <TableCell className="text-right space-x-1">
             <Button variant="ghost" size="icon" onClick={() => onEdit(b)} className="hover:text-primary">

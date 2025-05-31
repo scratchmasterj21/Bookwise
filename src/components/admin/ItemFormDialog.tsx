@@ -55,14 +55,19 @@ export default function ItemFormDialog({
   const [imageUrl, setImageUrl] = useState('');
   const [status, setStatus] = useState<'available' | 'booked' | 'maintenance'>('available');
 
+  // Building specific
   const [location, setLocation] = useState('');
+  const [floor, setFloor] = useState(''); // Added floor state
   const [notes, setNotes] = useState('');
 
+  // Device specific
   const [specificType, setSpecificType] = useState<DeviceType | ''>('');
   
+  // Room specific
   const [capacity, setCapacity] = useState<number>(0);
   const [amenities, setAmenities] = useState('');
 
+  // Common for Room & Device (location in building/room)
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | undefined>(undefined);
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(undefined);
 
@@ -75,20 +80,18 @@ export default function ItemFormDialog({
 
   useEffect(() => {
     if (open) {
-      setIsSaving(false); // Reset saving state when dialog opens/item changes
+      setIsSaving(false); 
       if (itemData) { 
         setName(itemData.name || '');
-        // Common fields for Room & Device
         if ('description' in itemData && typeof itemData.description === 'string') setDescription(itemData.description); else setDescription('');
         if ('status' in itemData && itemData.status) setStatus(itemData.status); else setStatus('available');
         if ('imageUrl' in itemData && typeof itemData.imageUrl === 'string') setImageUrl(itemData.imageUrl); else setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
 
-
         if (itemType === 'building') {
             const b = itemData as Building;
             setLocation(b.location || '');
+            setFloor(b.floor || ''); // Initialize floor
             setNotes(b.notes || '');
-            // imageUrl already handled if present in itemData, else set for building
             if (!itemData.imageUrl) setImageUrl(''); 
         } else if (itemType === 'room') {
             const r = itemData as Room;
@@ -99,9 +102,8 @@ export default function ItemFormDialog({
             const d = itemData as Device;
             setSpecificType(d.type || '');
             setSelectedBuildingId(d.buildingId || undefined);
-            // setSelectedRoomId will be handled by the next useEffect
         }
-      } else { // Reset for new item
+      } else { 
         setName('');
         setDescription('');
         setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
@@ -110,6 +112,7 @@ export default function ItemFormDialog({
         setCapacity(0);
         setAmenities('');
         setLocation('');
+        setFloor(''); // Reset floor
         setNotes('');
         setSelectedBuildingId(undefined);
         setSelectedRoomId(undefined);
@@ -120,7 +123,6 @@ export default function ItemFormDialog({
   useEffect(() => {
     if (open && itemType === 'device' && itemData && 'roomId' in itemData) {
         const d = itemData as Device;
-        // Only set room if building matches or if no building is selected yet (allowing initial load)
         if (d.buildingId === selectedBuildingId || !selectedBuildingId) {
           const currentBuildingRooms = d.buildingId ? allRooms.filter(room => room.buildingId === d.buildingId) : [];
           if (d.roomId && currentBuildingRooms.find(r => r.id === d.roomId)) {
@@ -128,11 +130,11 @@ export default function ItemFormDialog({
           } else {
               setSelectedRoomId(undefined); 
           }
-        } else { // Building has changed, reset room
+        } else { 
           setSelectedRoomId(undefined);
         }
-    } else if (open && itemType === 'device' && !itemData) { // New device
-        setSelectedRoomId(undefined); // Reset room for new device
+    } else if (open && itemType === 'device' && !itemData) { 
+        setSelectedRoomId(undefined); 
     }
   }, [open, itemData, itemType, selectedBuildingId, allRooms]);
 
@@ -141,23 +143,24 @@ export default function ItemFormDialog({
     e.preventDefault();
     setIsSaving(true);
     
-    let dataFields: Omit<Building, 'id'> | Omit<Room, 'id'> | Omit<Device, 'id'>;
+    let dataFields: Partial<Omit<Building, 'id'>> | Partial<Omit<Room, 'id'>> | Partial<Omit<Device, 'id'>>;
 
     if (itemType === 'building') {
-      const payload: Omit<Building, 'id'> = { name };
+      const payload: Partial<Omit<Building, 'id'>> = { name };
       if (location && location.trim()) payload.location = location.trim();
+      if (floor && floor.trim()) payload.floor = floor.trim(); // Add floor to payload
       if (notes && notes.trim()) payload.notes = notes.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
       dataFields = payload;
     } else if (itemType === 'room') {
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
-      const payload: Omit<Room, 'id'> = {
+      const payload: Partial<Omit<Room, 'id'>> = {
         name,
         capacity: capacity || 0,
         amenities: amenities.split(',').map(a => a.trim()).filter(a => a),
-        buildingId: selectedBuildingId!, // Form validation should ensure this
+        buildingId: selectedBuildingId!, 
         buildingName: selectedBuilding?.name,
-        category: (itemData as Room)?.category || '', // Retain category
+        category: (itemData as Room)?.category || '', 
         status,
       };
       if (description && description.trim()) payload.description = description.trim();
@@ -166,9 +169,9 @@ export default function ItemFormDialog({
     } else { // device
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const selectedRoom = allRooms.find(r => r.id === selectedRoomId);
-      const payload: Omit<Device, 'id'> = {
+      const payload: Partial<Omit<Device, 'id'>> = {
         name,
-        type: specificType as DeviceType, // Form validation should ensure this
+        type: specificType as DeviceType, 
         buildingId: selectedBuildingId!, 
         buildingName: selectedBuilding?.name,
         roomId: selectedRoomId!,
@@ -193,7 +196,6 @@ export default function ItemFormDialog({
       onOpenChange(false); 
     } catch (error) {
       console.error(`Error during ${itemType} save operation in dialog:`, error);
-      // Toast for error is usually handled by the page calling onSave
     } finally {
       setIsSaving(false);
     }
@@ -238,6 +240,10 @@ export default function ItemFormDialog({
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="location" className="text-right">Location</Label>
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="floor" className="text-right">Floor</Label>
+                <Input id="floor" value={floor} onChange={(e) => setFloor(e.target.value)} className="col-span-3" placeholder="e.g., Ground, 1st, 2nd" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="notes" className="text-right">Notes</Label>
