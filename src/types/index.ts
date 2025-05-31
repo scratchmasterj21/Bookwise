@@ -41,7 +41,6 @@ export interface Room {
   imageUrl?: string;
   description?: string;
   amenities?: string[];
-  category?: string;
   buildingId?: string;
   buildingName?: string;
   floorNumber: 1 | 2;

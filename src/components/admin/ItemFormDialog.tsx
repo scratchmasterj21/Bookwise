@@ -37,8 +37,6 @@ interface ItemFormDialogProps {
 }
 
 const deviceTypes: DeviceType[] = ['Laptop', 'Tablet', 'Monitor', 'Projector', 'Other'];
-const roomCategories: string[] = ["General", "Computer Room", "Music Room", "Lecture Hall", "Quiet Study", "Office", "Lab", "Other"];
-
 
 export default function ItemFormDialog({
   itemType,
@@ -72,8 +70,6 @@ export default function ItemFormDialog({
   const [capacity, setCapacity] = useState<number>(0);
   const [amenities, setAmenities] = useState('');
   const [roomFloorNumber, setRoomFloorNumber] = useState<1 | 2 | undefined>(undefined);
-  const [roomCategory, setRoomCategory] = useState<string>('');
-
 
   // Common for Room & Device (location in building/room)
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | undefined>(undefined);
@@ -109,7 +105,6 @@ export default function ItemFormDialog({
             setAmenities(r.amenities?.join(', ') || '');
             setSelectedBuildingId(r.buildingId || undefined);
             setRoomFloorNumber(r.floorNumber);
-            setRoomCategory(r.category || ''); // Set room category
             const building = buildings.find(b => b.id === r.buildingId);
             if (building?.numberOfFloors === 1) {
               setRoomFloorNumber(1);
@@ -131,7 +126,6 @@ export default function ItemFormDialog({
         setCapacity(0);
         setAmenities('');
         setRoomFloorNumber(undefined);
-        setRoomCategory(roomCategories[0] || ''); // Default category for new room
         setSpecificType('');
         setQuantity(1);
         setSelectedBuildingId(undefined);
@@ -165,22 +159,23 @@ export default function ItemFormDialog({
         if (building.numberOfFloors === 1) {
           setRoomFloorNumber(1);
         } else {
+          // If editing and building hasn't changed, keep existing floor. Otherwise, reset.
           if (!itemData || (itemData as Room).buildingId !== selectedBuildingId) {
             setRoomFloorNumber(undefined);
           }
         }
       } else {
-        setRoomFloorNumber(undefined);
+        setRoomFloorNumber(undefined); // No building selected, so no floor
       }
     }
-  }, [selectedBuildingId, itemType, buildings, itemData]);
+  }, [selectedBuildingId, itemType, buildings, itemData, open]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
 
-    let dataFields: Partial<Omit<Building, 'id'>> | Partial<Omit<Room, 'id'>> | Partial<Omit<Device, 'id'>>;
+    let dataFields: Omit<Building, 'id'> | Omit<Room, 'id'> | Omit<Device, 'id'>;
 
     if (itemType === 'building') {
       const payload: Partial<Omit<Building, 'id'>> = {
@@ -190,7 +185,7 @@ export default function ItemFormDialog({
       if (location && location.trim()) payload.location = location.trim();
       if (notes && notes.trim()) payload.notes = notes.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
-      dataFields = payload;
+      dataFields = payload as Omit<Building, 'id'>;
     } else if (itemType === 'room') {
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const payload: Partial<Omit<Room, 'id'>> = {
@@ -200,12 +195,11 @@ export default function ItemFormDialog({
         buildingId: selectedBuildingId!,
         buildingName: selectedBuilding?.name,
         floorNumber: roomFloorNumber!,
-        category: roomCategory, // Add category to payload
         status,
       };
       if (description && description.trim()) payload.description = description.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
-      dataFields = payload;
+      dataFields = payload as Omit<Room, 'id'>;
     } else { // device
       const selectedBuilding = buildings.find(b => b.id === selectedBuildingId);
       const selectedRoom = allRooms.find(r => r.id === selectedRoomId);
@@ -221,7 +215,7 @@ export default function ItemFormDialog({
       };
       if (description && description.trim()) payload.description = description.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
-      dataFields = payload;
+      dataFields = payload as Omit<Device, 'id'>;
     }
 
     let finalPayload: Item | ItemCreationData;
@@ -316,17 +310,6 @@ export default function ItemFormDialog({
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amenities" className="text-right">Amenities</Label>
                 <Input id="amenities" value={amenities} onChange={(e) => setAmenities(e.target.value)} className="col-span-3" placeholder="e.g. Projector, Whiteboard" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="room-category" className="text-right">Category</Label>
-                <Select value={roomCategory} onValueChange={setRoomCategory} required>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select room category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roomCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                  </SelectContent>
-                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="building-select-room" className="text-right">Building</Label>
@@ -444,5 +427,3 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
-
-    

@@ -38,13 +38,12 @@ export default function BookItemPage() {
         fetchRoomsFromDB(),
         fetchReservationsFromDB() 
       ]);
-      // Filter rooms that are meant for period-based booking, e.g., 'Computer Room' or 'Music Room'
-      setRooms(fetchedRooms.filter(room => room.category === 'Computer Room' || room.category === 'Music Room'));
+      setRooms(fetchedRooms); // Load all rooms
       setReservations(fetchedReservations);
     } catch (error) {
       console.error("Error fetching data for booking page:", error);
       toast({ title: "Error", description: "Could not load rooms or reservations.", variant: "destructive" });
-      setRooms([]); // Ensure rooms is empty on error
+      setRooms([]); 
       setReservations([]);
     } finally {
       setIsLoading(false);
@@ -78,7 +77,7 @@ export default function BookItemPage() {
       itemType: 'room', 
       startTime: bookingDetails.startTime,
       endTime: bookingDetails.endTime,
-      status: 'approved', // Period bookings are auto-approved for simplicity, adjust if needed
+      status: 'approved', 
       purpose: bookingDetails.purpose,
       bookedBy: user.displayName || user.email || "User",
     };
@@ -93,7 +92,7 @@ export default function BookItemPage() {
     } catch (error) {
        console.error("Error creating reservation:", error);
        toast({ title: "Booking Failed", description: "Could not create reservation. Please try again.", variant: "destructive"});
-       throw error; // Rethrow to be caught by the calendar component's finally block
+       throw error; 
     } finally {
         setIsBooking(false);
     }
@@ -118,8 +117,7 @@ export default function BookItemPage() {
       
       {(!isLoading && rooms.length === 0) ? (
          <p className="text-muted-foreground text-center mt-6">
-            No rooms (e.g., Computer Room, Music Room) are currently configured for period-based booking.
-            <br /> Please contact an administrator to set them up.
+            No rooms found. Please contact an administrator to add rooms to the system.
         </p>
       ) : (
         <WeeklyBookingCalendar 
