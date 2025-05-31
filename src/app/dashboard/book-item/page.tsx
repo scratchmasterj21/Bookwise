@@ -2,302 +2,212 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import ReservationCalendar from '@/components/reservations/ReservationCalendar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import type { Device, Room, ReservationRequest, DeviceType } from '@/types';
+import WeeklyBookingCalendar from '@/components/reservations/WeeklyBookingCalendar';
+import type { Room, Reservation, ReservationRequest, TimePeriod } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { DateRange } from 'react-day-picker';
-import Image from 'next/image';
-import { Laptop, Tablet, Monitor, Package, DoorOpen, Users, Building, CalendarCheck2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
+import { addDays, addHours, setHours, setMinutes, startOfWeek } from 'date-fns'; // For mock data
+import { format } from 'date-fns';
 
-const mockDevices: Device[] = [
-  { id: 'laptop1', name: 'Dell XPS 15', type: 'Laptop', status: 'available', imageUrl: 'https://placehold.co/600x400.png', description: 'High-performance laptop for demanding tasks.' },
-  { id: 'laptop2', name: 'MacBook Pro 14"', type: 'Laptop', status: 'available', imageUrl: 'https://placehold.co/600x400.png', description: 'Powerful and portable Apple laptop.' },
-  { id: 'tablet1', name: 'iPad Air', type: 'Tablet', status: 'booked', imageUrl: 'https://placehold.co/600x400.png', description: 'Lightweight tablet for on-the-go productivity.' },
-  { id: 'monitor1', name: 'Dell 27" 4K Monitor', type: 'Monitor', status: 'available', imageUrl: 'https://placehold.co/600x400.png', description: 'Crisp 4K display for enhanced visuals.' },
-  { id: 'projector1', name: 'Epson Home Cinema', type: 'Projector', status: 'available', imageUrl: 'https://placehold.co/600x400.png', description: 'Bright projector for presentations.' },
+// Define periods (could be moved to a config file or fetched)
+const TIME_PERIODS: TimePeriod[] = [
+  { name: '1st Period', label: '09:00 - 09:45', start: '09:00', end: '09:45' },
+  { name: '2nd Period', label: '09:50 - 10:35', start: '09:50', end: '10:35' },
+  { name: '3rd Period', label: '10:55 - 11:40', start: '10:55', end: '11:40' },
+  { name: '4th Period (Lower)', label: '11:45 - 12:30', start: '11:45', end: '12:30' },
+  { name: '4th Period (Upper)', label: '12:35 - 13:20', start: '12:35', end: '13:20' },
+  { name: '5th Period', label: '13:25 - 14:10', start: '13:25', end: '14:10' },
+  { name: '6th Period', label: '14:15 - 15:00', start: '14:15', end: '15:00' },
 ];
+
+const createTime = (date: Date, timeStr: string): Date => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return setMinutes(setHours(date, hours), minutes);
+};
+
+const today = new Date();
+const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+const tuesdayThisWeek = addDays(mondayThisWeek, 1);
+const wednesdayThisWeek = addDays(mondayThisWeek, 2);
+const thursdayThisWeek = addDays(mondayThisWeek, 3);
+const fridayThisWeek = addDays(mondayThisWeek, 4);
+
 
 const mockRooms: Room[] = [
-  { id: 'roomA', name: 'Conference Room A', capacity: 10, status: 'available', imageUrl: 'https://placehold.co/600x400.png', description: 'Large room with AV equipment.', amenities: ['Projector', 'Whiteboard', 'Video Conferencing'] },
-  { id: 'roomB', name: 'Meeting Room B', capacity: 4, status: 'available', imageUrl: 'https://placehold.co/600x400.png', description: 'Small, quiet room for focused meetings.', amenities: ['Whiteboard'] },
-  { id: 'roomC', name: 'Huddle Space C', capacity: 2, status: 'booked', imageUrl: 'https://placehold.co/600x400.png', description: 'Compact space for quick discussions.', amenities: [] },
+  { id: 'compRoom1', name: 'Computer Room Limpiada', capacity: 20, status: 'available', category: 'Computer Room', imageUrl: 'https://placehold.co/600x400.png', description: 'Main computer lab.' },
+  { id: 'musicRoom1', name: 'Music Room Miyamae', capacity: 15, status: 'available', category: 'Music Room', imageUrl: 'https://placehold.co/600x400.png', description: 'Music practice and recording room.' },
+  { id: 'compRoom2', name: 'Computer Room G3B', capacity: 20, status: 'available', category: 'Computer Room', imageUrl: 'https://placehold.co/600x400.png', description: 'Secondary computer lab.' },
 ];
 
-const ItemIcon = ({ itemType, deviceType }: { itemType: 'device' | 'room'; deviceType?: DeviceType }) => {
-  if (itemType === 'device') {
-    switch (deviceType) {
-      case 'Laptop': return <Laptop className="h-5 w-5 text-primary" />;
-      case 'Tablet': return <Tablet className="h-5 w-5 text-primary" />;
-      case 'Monitor': return <Monitor className="h-5 w-5 text-primary" />;
-      case 'Projector': return <Monitor className="h-5 w-5 text-primary" />; // Placeholder
-      default: return <Package className="h-5 w-5 text-primary" />;
-    }
-  }
-  return <Building className="h-5 w-5 text-primary" />;
-};
+const generateInitialMockReservations = (userId: string, userName?: string): Reservation[] => [
+  // Tuesday, 3rd Period, Computer Room Limpiada
+  {
+    id: 'res1', userId: 'teacher1', userName: 'Teacher A', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(tuesdayThisWeek, TIME_PERIODS[2].start), 
+    endTime: createTime(tuesdayThisWeek, TIME_PERIODS[2].end), 
+    status: 'approved', purpose: 'G3B Computer Class', bookedBy: 'Limpiada'
+  },
+  // Monday, 4th Period (Upper), Computer Room Limpiada
+   {
+    id: 'res2', userId: 'teacher2', userName: 'Teacher B', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(mondayThisWeek, TIME_PERIODS[4].start),
+    endTime: createTime(mondayThisWeek, TIME_PERIODS[4].end),
+    status: 'approved', purpose: 'G5B Computer Class (Gunma...)', bookedBy: 'Limpiada'
+  },
+  // Tuesday, 5th Period, Computer Room Limpiada
+  {
+    id: 'res3', userId: 'teacher3', userName: 'Teacher C', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(tuesdayThisWeek, TIME_PERIODS[5].start),
+    endTime: createTime(tuesdayThisWeek, TIME_PERIODS[5].end),
+    status: 'approved', purpose: 'G6B Computer Class', bookedBy: 'Limpiada'
+  },
+    // Wednesday, 5th Period, Computer Room Limpiada
+  {
+    id: 'res4', userId: 'teacher3', userName: 'Teacher C', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(wednesdayThisWeek, TIME_PERIODS[5].start),
+    endTime: createTime(wednesdayThisWeek, TIME_PERIODS[5].end),
+    status: 'approved', purpose: 'G3A Computer Class', bookedBy: 'Limpiada'
+  },
+  // Thursday, 5th Period, Music Room Miyamae
+  {
+    id: 'res5', userId: 'teacher4', userName: 'Teacher D', itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
+    startTime: createTime(thursdayThisWeek, TIME_PERIODS[5].start),
+    endTime: createTime(thursdayThisWeek, TIME_PERIODS[5].end),
+    status: 'approved', purpose: 'G1 Music', bookedBy: 'Miyamae'
+  },
+    // Thursday, 5th Period, Computer Room Limpiada (Concurrent with Music)
+  {
+    id: 'res6', userId: 'teacher2', userName: 'Teacher B', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(thursdayThisWeek, TIME_PERIODS[5].start),
+    endTime: createTime(thursdayThisWeek, TIME_PERIODS[5].end),
+    status: 'approved', purpose: 'G6A Computer Class', bookedBy: 'Limpiada'
+  },
+  // Friday, 5th Period, Music Room Miyamae
+  {
+    id: 'res7', userId: 'teacher4', userName: 'Teacher D', itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
+    startTime: createTime(fridayThisWeek, TIME_PERIODS[5].start),
+    endTime: createTime(fridayThisWeek, TIME_PERIODS[5].end),
+    status: 'approved', purpose: 'G3 Music', bookedBy: 'Miyamae'
+  },
+  // Monday, 6th Period, Music Room Miyamae
+  {
+    id: 'res8', userId: 'teacher1', userName: 'Teacher A',itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
+    startTime: createTime(mondayThisWeek, TIME_PERIODS[6].start),
+    endTime: createTime(mondayThisWeek, TIME_PERIODS[6].end),
+    status: 'approved', purpose: 'G2 Music', bookedBy: 'Miyamae'
+  },
+   // Tuesday, 6th Period, Computer Room Limpiada
+  {
+    id: 'res9', userId: 'teacher2', userName: 'Teacher B', itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(tuesdayThisWeek, TIME_PERIODS[6].start),
+    endTime: createTime(tuesdayThisWeek, TIME_PERIODS[6].end),
+    status: 'approved', purpose: 'G4A Computer Class', bookedBy: 'Limpiada'
+  },
+  // Wednesday, 6th Period, Computer Room Limpiada
+  {
+    id: 'res10', userId: 'teacher3', userName: 'Teacher C',itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(wednesdayThisWeek, TIME_PERIODS[6].start),
+    endTime: createTime(wednesdayThisWeek, TIME_PERIODS[6].end),
+    status: 'approved', purpose: 'G5A Computer Class', bookedBy: 'Limpiada'
+  },
+    // Friday, 6th Period, Computer Room Limpiada
+  {
+    id: 'res11', userId: 'teacher1', userName: 'Teacher A',itemId: 'compRoom1', itemName: 'Computer Room Limpiada', itemType: 'room',
+    startTime: createTime(fridayThisWeek, TIME_PERIODS[6].start),
+    endTime: createTime(fridayThisWeek, TIME_PERIODS[6].end),
+    status: 'approved', purpose: 'G4B Computer Class', bookedBy: 'Limpiada'
+  },
+  // User's own booking for testing
+  {
+    id: 'myres1', userId: userId, userName: userName, itemId: 'musicRoom1', itemName: 'Music Room Miyamae', itemType: 'room',
+    startTime: createTime(wednesdayThisWeek, TIME_PERIODS[0].start), // Wed, 1st Period
+    endTime: createTime(wednesdayThisWeek, TIME_PERIODS[0].end),
+    status: 'approved', purpose: 'My Practice', bookedBy: userName
+  },
+];
 
 
 export default function BookItemPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-
-  const [selectedDateRange, setSelectedDateRange] = useState<DateRange | undefined>();
-  const [startTime, setStartTime] = useState<string>('09:00');
-  const [endTime, setEndTime] = useState<string>('17:00');
   
-  const [itemType, setItemType] = useState<'device' | 'room' | ''>('');
-  const [allItems, setAllItems] = useState<(Device | Room)[]>([]);
-  const [filteredItems, setFilteredItems] = useState<(Device | Room)[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [currentItemDetails, setCurrentItemDetails] = useState<Device | Room | null>(null);
-
+  const [rooms, setRooms] = useState<Room[]>(mockRooms);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBooking, setIsBooking] = useState(false);
 
   useEffect(() => {
+    // Simulate fetching data
     setIsLoading(true);
-    // Simulate fetching all items
-    setTimeout(() => {
-      setAllItems([...mockDevices, ...mockRooms]);
-      setIsLoading(false);
-    }, 500);
-  }, []);
-
-  useEffect(() => {
-    if (itemType) {
-      if (itemType === 'device') {
-        setFilteredItems(mockDevices.filter(d => d.status === 'available'));
-      } else {
-        setFilteredItems(mockRooms.filter(r => r.status === 'available'));
-      }
-    } else {
-      setFilteredItems([]);
-    }
-    setSelectedItemId(null);
-    setCurrentItemDetails(null);
-  }, [itemType]);
-
-  useEffect(() => {
-    if (selectedItemId) {
-      setCurrentItemDetails(allItems.find(item => item.id === selectedItemId) || null);
-    } else {
-      setCurrentItemDetails(null);
-    }
-  }, [selectedItemId, allItems]);
-
-  const handleBookItem = async () => {
-    if (!user || !currentItemDetails || !selectedDateRange?.from || !itemType) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please select an item type, item, date range, and ensure times are set.',
-        variant: 'destructive',
-      });
-      return;
+    if (user) {
+        setReservations(generateInitialMockReservations(user.uid, user.displayName || user.email || "User"));
+    } else if (!authLoading) { // If not loading and no user
+        setReservations(generateInitialMockReservations("guest-user", "Guest")); // Show some bookings even for guests
     }
 
-    let finalStartTime: Date;
-    let finalEndTime: Date;
-
-    try {
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        finalStartTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDateRange.from, startHours), startMinutes),0),0);
-
-        const endDateRef = selectedDateRange.to || selectedDateRange.from; // Use 'to' if range, else 'from'
-        const [endHours, endMinutes] = endTime.split(':').map(Number);
-        finalEndTime = setMilliseconds(setSeconds(setMinutes(setHours(endDateRef, endHours), endMinutes),0),0);
-        
-        if (finalEndTime <= finalStartTime) {
-            toast({
-                title: 'Invalid Time',
-                description: 'End time must be after start time.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-    } catch (error) {
-        toast({
-            title: 'Invalid Time Format',
-            description: 'Please ensure start and end times are valid.',
-            variant: 'destructive',
-        });
-        return;
+    // If still no user after auth check, and no guest data loaded
+    if (!authLoading && !user && reservations.length === 0) {
+       setReservations(generateInitialMockReservations("guest-user", "Guest"));
     }
 
+    setIsLoading(false);
+  }, [user, authLoading]);
 
-    setIsBooking(true);
-    const reservationData: ReservationRequest = {
-      itemId: currentItemDetails.id,
-      itemName: currentItemDetails.name,
-      itemType: itemType as 'device' | 'room',
-      startTime: finalStartTime,
-      endTime: finalEndTime,
+  const handleBookSlot = async (bookingDetails: {
+    roomId: string;
+    roomName: string;
+    startTime: Date;
+    endTime: Date;
+    purpose: string;
+  }) => {
+    if (!user) {
+      toast({ title: "Not Logged In", description: "You need to be logged in to book.", variant: "destructive" });
+      throw new Error("User not logged in");
+    }
+
+    const newReservation: Reservation = {
+      id: `res-${Date.now()}`,
+      userId: user.uid,
+      userName: user.displayName || user.email,
+      itemId: bookingDetails.roomId,
+      itemName: bookingDetails.roomName,
+      itemType: 'room', // Currently only rooms for this calendar
+      startTime: bookingDetails.startTime,
+      endTime: bookingDetails.endTime,
+      status: 'approved', // Auto-approve for demo
+      purpose: bookingDetails.purpose,
+      bookedBy: user.displayName || user.email || "User",
     };
 
-    console.log('Booking item:', reservationData);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 700));
 
-    setTimeout(() => {
-      toast({
-        title: 'Item Booked!',
-        description: `${currentItemDetails.name} has been booked from ${format(finalStartTime, "PPpp")} to ${format(finalEndTime, "PPpp")}.`,
-      });
-      setSelectedItemId(null);
-      setCurrentItemDetails(null);
-      setItemType('');
-      setSelectedDateRange(undefined);
-      setStartTime('09:00');
-      setEndTime('17:00');
-      setIsBooking(false);
-    }, 1500);
+    setReservations(prev => [...prev, newReservation]);
+    toast({
+      title: 'Room Booked!',
+      description: `${bookingDetails.roomName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
+    });
   };
   
-  if (authLoading) {
+  if (authLoading || isLoading) {
      return (
         <div className="space-y-4">
-          <Skeleton className="h-8 w-1/3 mb-4" />
-          <div className="grid md:grid-cols-2 gap-6">
-            <Skeleton className="h-96 w-full" />
-            <Skeleton className="h-72 w-full" />
-          </div>
+          <Skeleton className="h-10 w-1/4 mb-4" />
+          <Skeleton className="h-12 w-1/3 mb-2" />
+          <Skeleton className="h-[500px] w-full" />
         </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold font-headline">Book an Item</h2>
-      <div className="grid md:grid-cols-2 gap-8 items-start">
-        <div>
-          <ReservationCalendar 
-            selectedDateRange={selectedDateRange}
-            onDateRangeChange={setSelectedDateRange}
-          />
-          <Card className="mt-4 shadow-lg">
-            <CardHeader>
-                <CardTitle className="text-lg font-headline">Select Time</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="start-time">Start Time</Label>
-                    <Input id="start-time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                </div>
-                <div>
-                    <Label htmlFor="end-time">End Time</Label>
-                    <Input id="end-time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl font-headline">Select Item</CardTitle>
-            <CardDescription>Choose an available item for your selected dates and times.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="item-type-select">Item Type</Label>
-              <Select
-                onValueChange={(value) => setItemType(value as 'device' | 'room' | '')}
-                value={itemType}
-              >
-                <SelectTrigger id="item-type-select" className="w-full">
-                  <SelectValue placeholder="Select item type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="device">Device</SelectItem>
-                  <SelectItem value="room">Room</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {itemType && (isLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-            <div className="space-y-2">
-              <Label htmlFor="item-select">Available {itemType === 'device' ? 'Devices' : 'Rooms'}</Label>
-              <Select
-                onValueChange={(itemId) => setSelectedItemId(itemId)}
-                value={selectedItemId || ""}
-                disabled={!itemType || filteredItems.length === 0}
-              >
-                <SelectTrigger id="item-select" className="w-full">
-                  <SelectValue placeholder={`Select a ${itemType}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      <div className="flex items-center gap-2">
-                        <ItemIcon itemType={itemType} deviceType={'type' in item ? (item as Device).type : undefined} />
-                        <span>{item.name} {'capacity' in item ? `(Capacity: ${(item as Room).capacity})` : ''}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-               {filteredItems.length === 0 && <p className="text-sm text-muted-foreground">No available {itemType}s found.</p>}
-            </div>
-            ))}
-
-            {currentItemDetails && (
-              <Card className="mt-4 bg-muted/50 p-4 animate-subtle-fade-in">
-                <CardHeader className="p-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <ItemIcon itemType={itemType as 'device' | 'room'} deviceType={'type' in currentItemDetails ? (currentItemDetails as Device).type : undefined} />
-                    <CardTitle className="text-lg">{currentItemDetails.name}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 text-sm space-y-2">
-                   {currentItemDetails.imageUrl && (
-                     <div className="my-2 rounded-md overflow-hidden aspect-video relative w-full max-w-xs mx-auto">
-                        <Image src={currentItemDetails.imageUrl} alt={currentItemDetails.name} layout="fill" objectFit="cover" data-ai-hint={itemType === 'device' ? "technology device" : "meeting room"} />
-                     </div>
-                   )}
-                  <p className="text-muted-foreground">{(currentItemDetails as Device).description || (currentItemDetails as Room).description}</p>
-                  {itemType === 'room' && 'capacity' in currentItemDetails && (
-                    <>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                            <Users className="h-4 w-4" /> 
-                            <span>Capacity: {(currentItemDetails as Room).capacity} people</span>
-                        </div>
-                        {(currentItemDetails as Room).amenities && ((currentItemDetails as Room).amenities?.length || 0) > 0 && (
-                        <div>
-                            <h4 className="font-medium text-foreground">Amenities:</h4>
-                            <ul className="list-disc list-inside text-muted-foreground">
-                            {(currentItemDetails as Room).amenities!.map(amenity => <li key={amenity}>{amenity}</li>)}
-                            </ul>
-                        </div>
-                        )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button 
-              onClick={handleBookItem} 
-              disabled={!currentItemDetails || !selectedDateRange?.from || isBooking || isLoading || !itemType} 
-              className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              {isBooking ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <CalendarCheck2 className="mr-2 h-4 w-4" />
-              )}
-              Book Item
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+      <h2 className="text-2xl font-semibold font-headline">Book a Room by Period</h2>
+      <WeeklyBookingCalendar 
+        rooms={rooms}
+        reservations={reservations}
+        onBookSlot={handleBookSlot}
+        periods={TIME_PERIODS}
+      />
     </div>
   );
 }
