@@ -37,6 +37,8 @@ interface ItemFormDialogProps {
 }
 
 const deviceTypes: DeviceType[] = ['Laptop', 'Tablet', 'Monitor', 'Projector', 'Other'];
+const roomCategories: string[] = ["General", "Computer Room", "Music Room", "Lecture Hall", "Quiet Study", "Office", "Lab", "Other"];
+
 
 export default function ItemFormDialog({
   itemType,
@@ -64,12 +66,14 @@ export default function ItemFormDialog({
 
   // Device specific
   const [specificType, setSpecificType] = useState<DeviceType | ''>('');
-  const [quantity, setQuantity] = useState<number>(1); // Added quantity for device
+  const [quantity, setQuantity] = useState<number>(1);
 
   // Room specific
   const [capacity, setCapacity] = useState<number>(0);
   const [amenities, setAmenities] = useState('');
   const [roomFloorNumber, setRoomFloorNumber] = useState<1 | 2 | undefined>(undefined);
+  const [roomCategory, setRoomCategory] = useState<string>('');
+
 
   // Common for Room & Device (location in building/room)
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | undefined>(undefined);
@@ -105,6 +109,7 @@ export default function ItemFormDialog({
             setAmenities(r.amenities?.join(', ') || '');
             setSelectedBuildingId(r.buildingId || undefined);
             setRoomFloorNumber(r.floorNumber);
+            setRoomCategory(r.category || ''); // Set room category
             const building = buildings.find(b => b.id === r.buildingId);
             if (building?.numberOfFloors === 1) {
               setRoomFloorNumber(1);
@@ -113,9 +118,9 @@ export default function ItemFormDialog({
             const d = itemData as Device;
             setSpecificType(d.type || '');
             setSelectedBuildingId(d.buildingId || undefined);
-            setQuantity(d.quantity || 1); // Set quantity for device
+            setQuantity(d.quantity || 1);
         }
-      } else {
+      } else { // Reset for new item
         setName('');
         setDescription('');
         setImageUrl(itemType !== 'building' ? 'https://placehold.co/600x400.png' : '');
@@ -126,8 +131,9 @@ export default function ItemFormDialog({
         setCapacity(0);
         setAmenities('');
         setRoomFloorNumber(undefined);
+        setRoomCategory(roomCategories[0] || ''); // Default category for new room
         setSpecificType('');
-        setQuantity(1); // Default quantity for new device
+        setQuantity(1);
         setSelectedBuildingId(undefined);
         setSelectedRoomId(undefined);
       }
@@ -194,7 +200,7 @@ export default function ItemFormDialog({
         buildingId: selectedBuildingId!,
         buildingName: selectedBuilding?.name,
         floorNumber: roomFloorNumber!,
-        category: (itemData as Room)?.category || '', // Keep existing category if editing
+        category: roomCategory, // Add category to payload
         status,
       };
       if (description && description.trim()) payload.description = description.trim();
@@ -211,7 +217,7 @@ export default function ItemFormDialog({
         roomId: selectedRoomId!,
         roomName: selectedRoom?.name,
         status,
-        quantity: quantity || 1, // Add quantity to payload
+        quantity: quantity || 1,
       };
       if (description && description.trim()) payload.description = description.trim();
       if (imageUrl && imageUrl.trim()) payload.imageUrl = imageUrl.trim();
@@ -310,6 +316,17 @@ export default function ItemFormDialog({
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amenities" className="text-right">Amenities</Label>
                 <Input id="amenities" value={amenities} onChange={(e) => setAmenities(e.target.value)} className="col-span-3" placeholder="e.g. Projector, Whiteboard" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="room-category" className="text-right">Category</Label>
+                <Select value={roomCategory} onValueChange={setRoomCategory} required>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select room category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roomCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="building-select-room" className="text-right">Building</Label>
@@ -427,3 +444,5 @@ export default function ItemFormDialog({
     </Dialog>
   );
 }
+
+    
