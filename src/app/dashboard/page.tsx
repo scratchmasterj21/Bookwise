@@ -7,7 +7,8 @@ import type { Reservation } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getReservations as fetchUserReservations, cancelReservation as cancelUserReservationFirestore } from '@/services/firestoreService';
+import { listenToUserReservations, cancelReservation as cancelUserReservationFirestore } from '@/services/firestoreService';
+import type { Unsubscribe } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
 
@@ -18,29 +19,28 @@ export default function MyReservationsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  const loadUserReservations = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const fetchedReservations = await fetchUserReservations(user.uid);
-      // Filter out cancelled reservations from initial display, unless you want to show them
-      setReservations(fetchedReservations.filter(r => r.status !== 'cancelled' && r.status !== 'rejected' && r.status !== 'completed'));
-    } catch (error) {
-      console.error("Error fetching user reservations:", error);
-      toast({ title: "Error", description: "Could not fetch your reservations.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, toast]);
-
   useEffect(() => {
-    if (user) {
-      loadUserReservations();
-    } else if (!authLoading) { 
-      setReservations([]); 
+    let unsubscribe: Unsubscribe | undefined;
+
+    if (user && !authLoading) {
+      setIsLoading(true);
+      unsubscribe = listenToUserReservations(user.uid, (fetchedReservations) => {
+        setReservations(
+          fetchedReservations.filter(r => r.status !== 'cancelled' && r.status !== 'rejected' && r.status !== 'completed')
+        );
+        setIsLoading(false);
+      });
+    } else if (!user && !authLoading) {
+      setReservations([]);
       setIsLoading(false);
     }
-  }, [user, authLoading, loadUserReservations]);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [user, authLoading]);
 
   const handleCancelReservation = async (reservationId: string) => {
     setIsProcessing(true);
@@ -50,7 +50,7 @@ export default function MyReservationsPage() {
         title: "Reservation Cancelled",
         description: `Reservation ID ${reservationId} has been cancelled.`,
       });
-      setReservations(prev => prev.filter(r => r.id !== reservationId));
+      // Real-time listener will update the reservations state
     } catch (error) {
       console.error("Error cancelling reservation:", error);
       toast({ title: "Error", description: "Could not cancel reservation.", variant: "destructive" });

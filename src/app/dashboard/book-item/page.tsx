@@ -8,7 +8,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
-import { getRooms as fetchRoomsFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
+import { getRooms as fetchRoomsFromDB, addReservation, updateReservationPurpose, deleteReservation as deleteReservationFromDB, listenToReservationsByType } from '@/services/firestoreService';
+import type { Unsubscribe } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TIME_PERIODS } from '@/lib/constants';
@@ -24,38 +25,47 @@ export default function BookRoomPage() {
   const [isProcessingGlobal, setIsProcessingGlobal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
-  const [calendarKey, setCalendarKey] = useState(Date.now()); // Key to reset calendar
+  const [calendarKey, setCalendarKey] = useState(Date.now()); 
 
-
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [fetchedRooms, fetchedReservations] = await Promise.all([
-        fetchRoomsFromDB(),
-        fetchReservationsFromDB() 
-      ]);
-      const bookableRooms = fetchedRooms.filter(room => room.status === 'available');
-      setRooms(bookableRooms); 
-      setReservations(fetchedReservations.filter(r => r.itemType === 'room'));
-    } catch (error) {
-      console.error("Error fetching data for booking page:", error);
-      toast({ title: "Error", description: "Could not load rooms or reservations.", variant: "destructive" });
-      setRooms([]); 
-      setReservations([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
 
   useEffect(() => {
+    let reservationUnsubscribe: Unsubscribe | undefined;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const fetchedRooms = await fetchRoomsFromDB();
+        const bookableRooms = fetchedRooms.filter(room => room.status === 'available');
+        setRooms(bookableRooms);
+        
+        reservationUnsubscribe = listenToReservationsByType('room', (fetchedReservations) => {
+          setReservations(fetchedReservations);
+          setIsLoading(false); // Set loading to false after both rooms and initial reservations are loaded
+        });
+
+      } catch (error) {
+        console.error("Error fetching initial data for booking page:", error);
+        toast({ title: "Error", description: "Could not load rooms or reservations.", variant: "destructive" });
+        setRooms([]); 
+        setReservations([]);
+        setIsLoading(false);
+      }
+    };
+    
     if (!authLoading) { 
         fetchData();
     }
-  }, [authLoading, fetchData]);
+    
+    return () => {
+      if (reservationUnsubscribe) {
+        reservationUnsubscribe();
+      }
+    };
+  }, [authLoading, toast]);
 
   const handleBookSlot = async (bookingDetails: {
-    itemId: string; // Changed from roomId to itemId for consistency
-    itemName: string; // Changed from roomName
+    itemId: string; 
+    itemName: string; 
     startTime: Date;
     endTime: Date;
     purpose: string;
@@ -80,8 +90,8 @@ export default function BookRoomPage() {
     };
 
     try {
-      const addedReservation = await addReservation(newReservationData);
-      setReservations(prev => [...prev, addedReservation]); 
+      await addReservation(newReservationData);
+      // Listener will update UI
       toast({
         title: 'Room Booked!',
         description: `${bookingDetails.itemName} booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}. Purpose: ${bookingDetails.purpose}`,
@@ -106,9 +116,7 @@ export default function BookRoomPage() {
          throw new Error("Purpose must be a string for room bookings.");
       }
       await updateReservationPurpose(reservationId, newDetails.purpose);
-      setReservations(prev => 
-        prev.map(res => res.id === reservationId ? { ...res, purpose: newDetails.purpose } : res)
-      );
+      // Listener will update UI
       toast({
         title: 'Booking Updated!',
         description: `Booking purpose has been updated.`,
@@ -132,7 +140,7 @@ export default function BookRoomPage() {
     setIsProcessingGlobal(true);
     try {
       await deleteReservationFromDB(reservationToDelete);
-      setReservations(prev => prev.filter(res => res.id !== reservationToDelete));
+      // Listener will update UI
       toast({ title: "Booking Deleted", description: "The reservation has been successfully deleted.", variant: "destructive" });
     } catch (error) {
       console.error("Error deleting reservation:", error);
@@ -157,7 +165,6 @@ export default function BookRoomPage() {
     setIsProcessingGlobal(true);
     let successCount = 0;
     let failCount = 0;
-    const newBookings: Reservation[] = [];
 
     for (const slot of details.slots) {
       const startTime = setMilliseconds(setSeconds(setMinutes(setHours(slot.day, parseInt(slot.period.start.split(':')[0])), parseInt(slot.period.start.split(':')[1])),0),0);
@@ -177,8 +184,7 @@ export default function BookRoomPage() {
         bookedBy: user.displayName || user.email || "User",
       };
       try {
-        const addedReservation = await addReservation(newReservationData);
-        newBookings.push(addedReservation);
+        await addReservation(newReservationData);
         successCount++;
       } catch (error) {
         console.error(`Error booking room slot ${format(startTime, "MMM d, HH:mm")} for ${details.itemName}:`, error);
@@ -186,7 +192,7 @@ export default function BookRoomPage() {
       }
     }
     
-    setReservations(prev => [...prev, ...newBookings]);
+    // Listener will update UI
 
     if (successCount > 0) {
       toast({
@@ -197,7 +203,7 @@ export default function BookRoomPage() {
        toast({ title: "Multi-Booking Failed", description: `All ${failCount} attempted bookings failed for ${details.itemName}. Please try again.`, variant: "destructive" });
     }
     
-    setCalendarKey(Date.now()); // Force re-render of calendar to reset its internal state
+    setCalendarKey(Date.now()); 
     setIsProcessingGlobal(false);
   };
   
@@ -205,7 +211,7 @@ export default function BookRoomPage() {
      return (
         <div className="space-y-4">
           <Skeleton className="h-10 w-1/3 mb-4" />
-          <Skeleton className="h-12 w-full mb-2" /> {/* Adjusted for select and week controls */}
+          <Skeleton className="h-12 w-full mb-2" /> 
           <Skeleton className="h-[500px] w-full" />
         </div>
     );
@@ -229,9 +235,9 @@ export default function BookRoomPage() {
           itemType="room"
           reservations={reservations}
           onBookSlot={handleBookSlot}
-          onUpdateSlot={handleUpdateSlot as any} // Cast to allow purpose string
+          onUpdateSlot={handleUpdateSlot as any} 
           onDeleteSlot={handleDeleteSlot}
-          onConfirmMultiBook={handleConfirmMultiBookRoom as any} // Cast to allow room multi-book structure
+          onConfirmMultiBook={handleConfirmMultiBookRoom as any} 
           periods={TIME_PERIODS}
           isProcessingGlobal={isProcessingGlobal}
           itemDisplayName="Room"

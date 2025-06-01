@@ -8,7 +8,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
-import { getDevices as fetchDevicesFromDB, getReservations as fetchReservationsFromDB, addReservation, updateReservation, deleteReservation as deleteReservationFromDB } from '@/services/firestoreService';
+import { getDevices as fetchDevicesFromDB, addReservation, updateReservation, deleteReservation as deleteReservationFromDB, listenToReservationsByType } from '@/services/firestoreService';
+import type { Unsubscribe } from 'firebase/firestore';
 import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from "@/components/ui/button";
@@ -30,31 +31,41 @@ export default function BookDeviceDailyPage() {
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
   const [tableKey, setTableKey] = useState(Date.now()); 
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [fetchedDevices, fetchedReservations] = await Promise.all([
-        fetchDevicesFromDB(),
-        fetchReservationsFromDB()
-      ]);
-      const bookableDevices = fetchedDevices.filter(device => device.status === 'available' && device.quantity > 0);
-      setDevices(bookableDevices);
-      setReservations(fetchedReservations.filter(r => r.itemType === 'device'));
-    } catch (error) {
-      console.error("Error fetching data for daily device booking page:", error);
-      toast({ title: "Error", description: "Could not load devices or reservations.", variant: "destructive" });
-      setDevices([]);
-      setReservations([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
   useEffect(() => {
+    let reservationUnsubscribe: Unsubscribe | undefined;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const fetchedDevices = await fetchDevicesFromDB();
+        const bookableDevices = fetchedDevices.filter(device => device.status === 'available' && device.quantity > 0);
+        setDevices(bookableDevices);
+        
+        reservationUnsubscribe = listenToReservationsByType('device', (fetchedReservations) => {
+          setReservations(fetchedReservations);
+          setIsLoading(false);
+        });
+
+      } catch (error) {
+        console.error("Error fetching initial data for daily device booking page:", error);
+        toast({ title: "Error", description: "Could not load devices or reservations.", variant: "destructive" });
+        setDevices([]);
+        setReservations([]);
+        setIsLoading(false);
+      }
+    };
+
     if (!authLoading) {
         fetchData();
     }
-  }, [authLoading, fetchData]);
+
+    return () => {
+      if (reservationUnsubscribe) {
+        reservationUnsubscribe();
+      }
+    };
+  }, [authLoading, toast]);
+
 
   const handleBookSlot = async (bookingDetails: {
     itemId: string;
@@ -87,8 +98,8 @@ export default function BookDeviceDailyPage() {
     };
 
     try {
-      const addedReservation = await addReservation(newReservationData);
-      setReservations(prev => [...prev, addedReservation]);
+      await addReservation(newReservationData);
+      // Listener will update UI
       toast({
         title: 'Device Booked!',
         description: `${bookingDetails.itemName} (Qty: ${newReservationData.bookedQuantity}) booked for ${format(bookingDetails.startTime, "MMM d, HH:mm")} - ${format(bookingDetails.endTime, "HH:mm")}.`,
@@ -110,9 +121,7 @@ export default function BookDeviceDailyPage() {
     setIsProcessingGlobal(true);
     try {
       await updateReservation(reservationId, newDetails);
-      setReservations(prev =>
-        prev.map(res => res.id === reservationId ? { ...res, ...newDetails } : res)
-      );
+      // Listener will update UI
       toast({
         title: 'Booking Updated!',
         description: `Booking details have been updated.`,
@@ -136,7 +145,7 @@ export default function BookDeviceDailyPage() {
     setIsProcessingGlobal(true);
     try {
       await deleteReservationFromDB(reservationToDelete);
-      setReservations(prev => prev.filter(res => res.id !== reservationToDelete));
+      // Listener will update UI
       toast({ title: "Device Booking Deleted", description: "The reservation has been successfully deleted.", variant: "destructive" });
     } catch (error) {
       console.error("Error deleting device reservation:", error);
@@ -163,7 +172,6 @@ export default function BookDeviceDailyPage() {
     setIsProcessingGlobal(true);
     let successCount = 0;
     let failCount = 0;
-    const newBookings: Reservation[] = [];
 
     for (const period of details.periods) {
       const startTime = setMilliseconds(setSeconds(setMinutes(setHours(selectedDate, parseInt(period.start.split(':')[0])), parseInt(period.start.split(':')[1])),0),0);
@@ -185,8 +193,7 @@ export default function BookDeviceDailyPage() {
         bookedBy: user.displayName || user.email || "User",
       };
       try {
-        const addedReservation = await addReservation(newReservationData);
-        newBookings.push(addedReservation);
+        await addReservation(newReservationData);
         successCount++;
       } catch (error) {
         console.error(`Error booking slot ${format(startTime, "MMM d, HH:mm")} for ${details.deviceName}:`, error);
@@ -194,7 +201,7 @@ export default function BookDeviceDailyPage() {
       }
     }
     
-    setReservations(prev => [...prev, ...newBookings]);
+    // Listener will update UI
 
     if (successCount > 0) {
       toast({
@@ -210,7 +217,7 @@ export default function BookDeviceDailyPage() {
   };
 
 
-  if (authLoading || (isLoading && devices.length === 0)) {
+  if (authLoading || (isLoading && devices.length === 0 && reservations.length === 0)) {
      return (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
@@ -259,7 +266,7 @@ export default function BookDeviceDailyPage() {
          <p className="text-muted-foreground text-center mt-6">
             No devices currently available for booking.
         </p>
-      ) : isLoading ? (
+      ) : isLoading && reservations.length === 0 ? (
          <Skeleton className="h-[500px] w-full" />
       ) : (
         <DailyBookingTable

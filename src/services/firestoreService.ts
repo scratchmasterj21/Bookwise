@@ -14,7 +14,9 @@ import {
   QueryDocumentSnapshot,
   FirestoreDataConverter,
   DocumentSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot, // Added for real-time listeners
+  Unsubscribe // Added for listener cleanup
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Building, Room, Device, Reservation, User } from '@/types';
@@ -127,6 +129,14 @@ const reservationConverter: FirestoreDataConverter<Reservation> = {
     if (reservation.bookedQuantity) data.bookedQuantity = reservation.bookedQuantity;
     if (reservation.bookedBy) data.bookedBy = reservation.bookedBy;
 
+    // Add createdAt only for new documents
+    // This assumes that if 'createdAt' is not in reservationData, it's a new doc.
+    // For updates, 'createdAt' should not be overwritten by serverTimestamp().
+    if (!('createdAt' in reservation) || !reservation.createdAt) {
+        data.createdAt = serverTimestamp();
+    }
+
+
     return data;
   },
   fromFirestore(snapshot: QueryDocumentSnapshot | DocumentSnapshot): Reservation {
@@ -136,7 +146,7 @@ const reservationConverter: FirestoreDataConverter<Reservation> = {
       ...data,
       startTime: (data.startTime as Timestamp).toDate(),
       endTime: (data.endTime as Timestamp).toDate(),
-      bookedQuantity: data.bookedQuantity || (data.itemType === 'device' ? 1 : undefined), // Default to 1 for devices if not present
+      bookedQuantity: data.bookedQuantity || (data.itemType === 'device' ? 1 : undefined),
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
     } as Reservation;
@@ -233,10 +243,9 @@ export const addReservation = async (reservationData: Omit<Reservation, 'id' | '
   const dataWithTimestampsAndQuantity = {
     ...reservationData,
     bookedQuantity: reservationData.itemType === 'device' ? (reservationData.bookedQuantity || 1) : undefined,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    // serverTimestamp will be handled by converter now for createdAt
   };
-  const docRef = await addDoc(reservationsCol, dataWithTimestampsAndQuantity as any);
+  const docRef = await addDoc(reservationsCol, dataWithTimestampsAndQuantity as any); // Cast to any to satisfy converter's input for new docs
   const newDocSnap = await getDoc(docRef.withConverter(reservationConverter));
   if (!newDocSnap.exists()) {
     throw new Error("Failed to create and retrieve reservation");
@@ -244,6 +253,49 @@ export const addReservation = async (reservationData: Omit<Reservation, 'id' | '
   return newDocSnap.data()!;
 };
 
+// Real-time listener for reservations by type (room/device)
+export const listenToReservationsByType = (
+  itemType: 'room' | 'device',
+  callback: (reservations: Reservation[]) => void
+): Unsubscribe => {
+  const q = query(collection(db, 'reservations'), where('itemType', '==', itemType)).withConverter(reservationConverter);
+  return onSnapshot(q, (querySnapshot) => {
+    const reservations = querySnapshot.docs.map(doc => doc.data());
+    callback(reservations);
+  }, (error) => {
+    console.error(`Error listening to ${itemType} reservations: `, error);
+  });
+};
+
+// Real-time listener for a specific user's reservations
+export const listenToUserReservations = (
+  userId: string,
+  callback: (reservations: Reservation[]) => void
+): Unsubscribe => {
+  const q = query(collection(db, 'reservations'), where('userId', '==', userId)).withConverter(reservationConverter);
+  return onSnapshot(q, (querySnapshot) => {
+    const reservations = querySnapshot.docs.map(doc => doc.data());
+    callback(reservations);
+  }, (error) => {
+    console.error(`Error listening to user ${userId} reservations: `, error);
+  });
+};
+
+// Real-time listener for all reservations (for admin)
+export const listenToAllReservationsForAdmin = (
+  callback: (reservations: Reservation[]) => void
+): Unsubscribe => {
+  const q = query(collection(db, 'reservations')).withConverter(reservationConverter);
+  return onSnapshot(q, (querySnapshot) => {
+    const reservations = querySnapshot.docs.map(doc => doc.data());
+    callback(reservations);
+  }, (error) => {
+    console.error(`Error listening to all reservations: `, error);
+  });
+};
+
+
+// One-time fetch (kept for non-real-time needs if any, or can be removed if all use listeners)
 export const getReservations = async (userId?: string, itemId?: string): Promise<Reservation[]> => {
   let q = query(collection(db, 'reservations'));
   const conditions = [];
@@ -262,6 +314,7 @@ export const getReservations = async (userId?: string, itemId?: string): Promise
   const snapshot = await getDocs(q.withConverter(reservationConverter));
   return snapshot.docs.map(doc => doc.data());
 };
+
 
 export const updateReservationStatus = async (reservationId: string, status: Reservation['status']): Promise<void> => {
   const reservationRef = doc(db, 'reservations', reservationId);

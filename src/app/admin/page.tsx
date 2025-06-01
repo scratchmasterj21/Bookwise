@@ -6,7 +6,8 @@ import type { Reservation } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getReservations as fetchAllReservationsFromDB, updateReservationStatus } from '@/services/firestoreService';
+import { listenToAllReservationsForAdmin, updateReservationStatus } from '@/services/firestoreService';
+import type { Unsubscribe } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
 
@@ -16,27 +17,22 @@ export default function ManageReservationsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  const fetchAllReservations = useCallback(async () => {
+  useEffect(() => {
     setIsLoading(true);
-    try {
-      const fetchedReservations = await fetchAllReservationsFromDB(); 
-      // Show pending first, then approved/active, then others
+    const unsubscribe = listenToAllReservationsForAdmin((fetchedReservations) => {
       const sortedReservations = fetchedReservations.sort((a, b) => {
         const statusOrder = { pending: 0, approved: 1, active: 1, completed: 2, rejected: 3, cancelled: 4 };
-        return statusOrder[a.status] - statusOrder[b.status] || new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+        // Handle potential undefined status by placing them at the end or assigning a default order
+        const statusA = a.status || 'cancelled'; 
+        const statusB = b.status || 'cancelled';
+        return statusOrder[statusA] - statusOrder[statusB] || new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
       });
-      setReservations(sortedReservations); 
-    } catch (error) {
-      console.error("Error fetching all reservations:", error);
-      toast({ title: "Error", description: "Could not fetch reservations.", variant: "destructive" });
-    } finally {
+      setReservations(sortedReservations);
       setIsLoading(false);
-    }
-  }, [toast]);
+    });
 
-  useEffect(() => {
-    fetchAllReservations();
-  }, [fetchAllReservations]);
+    return () => unsubscribe();
+  }, []);
 
   const handleApproval = async (reservationId: string, approved: boolean) => {
     setIsProcessing(true);
@@ -47,12 +43,7 @@ export default function ManageReservationsPage() {
         title: `Reservation ${approved ? 'Approved' : 'Rejected'}`,
         description: `Reservation ID ${reservationId} has been updated.`,
       });
-      // Optimistically update UI or refetch
-      setReservations(prev => 
-        prev.map(r => r.id === reservationId ? {...r, status: newStatus} : r)
-          .filter(r => !(newStatus === 'rejected' && r.id === reservationId)) // Optionally remove rejected ones immediately
-      );
-      // Or simply refetch: fetchAllReservations();
+      // Real-time listener will update the reservations state
     } catch (error) {
       console.error("Error updating reservation status:", error);
       toast({ title: "Error", description: "Could not update reservation status.", variant: "destructive" });
