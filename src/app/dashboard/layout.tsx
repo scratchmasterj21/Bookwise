@@ -9,10 +9,10 @@ import { CalendarDays, CalendarPlus, View, Laptop, Monitor } from 'lucide-react'
 
 const dashboardTabs = [
   { name: 'My Reservations', href: '/dashboard', icon: CalendarDays },
-  { name: 'Book Room (Week)', href: '/dashboard/book-item', icon: CalendarPlus },
-  { name: 'Book Room (Day)', href: '/dashboard/daily-bookings', icon: View },
-  { name: 'Book Device (Week)', href: '/dashboard/book-device-weekly', icon: Laptop },
-  { name: 'Book Device (Day)', href: '/dashboard/book-device-daily', icon: Monitor },
+  { name: 'Book Room (Weekly)', href: '/dashboard/book-item', icon: CalendarPlus },
+  { name: 'Book Room (Daily)', href: '/dashboard/daily-bookings', icon: View },
+  { name: 'Book Device (Weekly)', href: '/dashboard/book-device-weekly', icon: Laptop },
+  { name: 'Book Device (Daily)', href: '/dashboard/book-device-daily', icon: Monitor },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
