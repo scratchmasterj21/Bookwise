@@ -21,10 +21,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '../ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { DEVICE_TYPES_WITH_ICONS, DEVICE_PURPOSE_OPTIONS } from '@/lib/constants';
+import { Switch } from '../ui/switch';
 
 
 type Item = Room | Device;
@@ -660,12 +659,13 @@ export default function DailyBookingTable({
                             )}
                           { (cellData.status === 'booked' || cellData.status === 'all-booked') && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                              <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
-                                <div className={cn("block font-semibold text-sm", itemStyling.textClass)}>
-                                  {cellData.bookingEntries[0].itemName}
-                                </div>
-                                <ul className="space-y-0.5">
+                                
+                                <ul className="space-y-1">
                                   {cellData.bookingEntries.map(entry => (
-                                    <li key={entry.reservationId} className={cn("pb-1 mb-1 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
+                                    <li key={entry.reservationId} className={cn("pb-1 mb-0.5 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
+                                      <div className={cn("block font-bold text-base", itemStyling.textClass)}>
+                                        {entry.itemName}
+                                      </div>
                                       <div className={cn(entry.isCurrentUserBooking && "text-primary")}>{getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}</div>
                                       {itemType === 'room' && entry.purpose && <div className="text-slate-600 text-[10px]">{entry.purpose}</div>}
                                       {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600 text-[10px]">{entry.devicePurposes.join(', ')}</div>}
@@ -686,10 +686,11 @@ export default function DailyBookingTable({
                               </div>
                           ) : cellData.isPast && cellData.status === 'past-booked' && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                               <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight opacity-60")}>
-                                  <div className={cn("block font-semibold text-sm", itemStyling.textClass)}>{cellData.bookingEntries[0].itemName}</div>
-                                  <ul className="space-y-0.5">
+                                  
+                                  <ul className="space-y-1">
                                     {cellData.bookingEntries.map(entry => (
-                                      <li key={entry.reservationId} className="pb-1 mb-1 border-b border-slate-200 last:border-b-0">
+                                      <li key={entry.reservationId} className="pb-1 mb-0.5 border-b border-slate-200 last:border-b-0">
+                                        <div className={cn("block font-bold text-base", itemStyling.textClass)}>{entry.itemName}</div>
                                         <div className={cn(entry.isCurrentUserBooking && "text-primary")}>{getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}</div>
                                         {itemType === 'room' && entry.purpose && <div className="text-slate-600 text-[10px]">{entry.purpose}</div>}
                                         {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600 text-[10px]">{entry.devicePurposes.join(', ')}</div>}
@@ -776,7 +777,7 @@ export default function DailyBookingTable({
                   </div>
                   <div className="space-y-2">
                     <Label className="font-medium">Purpose (select all that apply):</Label>
-                    <ScrollArea className="h-32 border rounded-md p-2">
+                    <div className="max-h-32 overflow-y-auto border rounded-md p-2">
                       <div className="grid grid-cols-2 gap-2">
                         {DEVICE_PURPOSE_OPTIONS.map((purposeOpt) => (
                           <div key={purposeOpt} className="flex items-center space-x-2">
@@ -792,7 +793,7 @@ export default function DailyBookingTable({
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="booking-notes" className="font-medium">{bookingModalPurposeLabel}:</Label>
@@ -833,7 +834,7 @@ export default function DailyBookingTable({
             </DialogHeader>
             <div className="space-y-4 py-3">
               <p className="text-sm">You are booking <strong>{multiBookSelectedPeriodsForItem.length}</strong> period(s) on <strong>{format(selectedDate, 'MMM dd, yyyy')}</strong> for <strong>{itemType === 'device' ? `${(multiBookTargetItem as Device).roomName || 'N/A'} - ` : ''}{multiBookTargetItem.name}</strong>.</p>
-              <ScrollArea className="h-24 border rounded-md p-2 text-sm">
+              <div className="max-h-24 overflow-y-auto border rounded-md p-2 text-sm">
                 <ul>
                   {multiBookSelectedPeriodsForItem.map(period => (
                     <li key={period.name}>
@@ -841,7 +842,7 @@ export default function DailyBookingTable({
                     </li>
                   ))}
                 </ul>
-              </ScrollArea>
+              </div>
               
               {itemType === 'device' && (
                 <>
@@ -862,7 +863,7 @@ export default function DailyBookingTable({
                   </div>
                   <div className="space-y-2">
                     <Label className="font-medium">Purpose (select all that apply):</Label>
-                    <ScrollArea className="h-32 border rounded-md p-2">
+                    <div className="max-h-32 overflow-y-auto border rounded-md p-2">
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                         {DEVICE_PURPOSE_OPTIONS.map((purposeOpt) => (
                           <div key={`multi-daily-${purposeOpt}`} className="flex items-center space-x-2">
@@ -878,7 +879,7 @@ export default function DailyBookingTable({
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="multi-daily-booking-notes" className="font-medium">Additional Notes (optional):</Label>
