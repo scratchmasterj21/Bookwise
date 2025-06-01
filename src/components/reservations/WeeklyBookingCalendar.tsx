@@ -40,6 +40,8 @@ interface BookingEntry {
   notes?: string;
   purpose?: string; 
   itemName?: string;
+  itemId?: string; // Added for admin edit context
+  userId?: string; // Added for admin edit context
 }
 
 interface CellDisplayInfo {
@@ -47,7 +49,7 @@ interface CellDisplayInfo {
   isPast: boolean;
   displayText?: string;
   bookingEntries?: BookingEntry[];
-  mainReservation?: Reservation;
+  mainReservation?: Reservation; // This might be the user's own, or the first in the list for admin actions
   bookedUnits?: number;
   itemTotalQuantity?: number;
   availableQuantity?: number;
@@ -150,6 +152,10 @@ const getItemStyling = (item: Item, itemTypeProp: 'room' | 'device'): ItemStylin
 
 const getLastName = (fullName?: string): string => {
   if (!fullName) return 'User';
+  const parts = fullName.split(' ');
+  if (parts.length > 1) {
+    return parts[parts.length - 1];
+  }
   return fullName; 
 };
 
@@ -268,7 +274,7 @@ export default function WeeklyBookingCalendar({
     });
   }, [reservations, itemType]);
 
-  const handleSlotAction = (day: Date, period: TimePeriod, actionType: 'book' | 'edit', existingReservation?: Reservation) => {
+  const handleSlotAction = (day: Date, period: TimePeriod, actionType: 'book' | 'edit', reservationToActOn?: Reservation) => {
     if (isProcessingGlobal || isSlotProcessing) return;
      if (!user) {
       toast({ title: "Authentication required", description: "Please log in.", variant: "destructive" });
@@ -277,23 +283,23 @@ export default function WeeklyBookingCalendar({
 
     let targetItem: Item | undefined | null = null;
 
-    if (actionType === 'edit' && existingReservation) {
-      targetItem = items.find(i => i.id === existingReservation.itemId);
-       const canManageBooking = isAdmin || existingReservation.userId === user.uid;
+    if (actionType === 'edit' && reservationToActOn) {
+      targetItem = items.find(i => i.id === reservationToActOn.itemId);
+       const canManageBooking = isAdmin || reservationToActOn.userId === user.uid;
        if (!canManageBooking) {
         toast({ title: "Permission Denied", description: "You cannot edit this booking.", variant: "destructive"});
         return;
       }
-      setCurrentBookingSlot({ day, period, item: targetItem, existingReservation });
+      setCurrentBookingSlot({ day, period, item: targetItem, existingReservation: reservationToActOn });
       if (itemType === 'room') {
-        setBookingPurpose(existingReservation.purpose || '');
+        setBookingPurpose(reservationToActOn.purpose || '');
       } else { 
-        setSelectedDevicePurposes(existingReservation.devicePurposes || []);
-        setBookingNotes(existingReservation.notes || '');
-        setBookingQuantity(existingReservation.bookedQuantity || 1);
+        setSelectedDevicePurposes(reservationToActOn.devicePurposes || []);
+        setBookingNotes(reservationToActOn.notes || '');
+        setBookingQuantity(reservationToActOn.bookedQuantity || 1);
       }
-      setEditingReservationId(existingReservation.id);
-      setModalSelectedItemIdForBooking(existingReservation.itemId);
+      setEditingReservationId(reservationToActOn.id);
+      setModalSelectedItemIdForBooking(reservationToActOn.itemId);
     } else if (actionType === 'book') {
         if (selectedItemId === ALL_ITEMS_ID) {
              setCurrentBookingSlot({ day, period, item: null }); 
@@ -378,6 +384,7 @@ export default function WeeklyBookingCalendar({
   const getCellDisplayData = useCallback((day: Date, period: TimePeriod): CellDisplayInfo => {
     const slotStartDateTime = setMilliseconds(setSeconds(setMinutes(setHours(day, parseInt(period.start.split(':')[0])), parseInt(period.start.split(':')[1])),0),0);
     const isPast = isBefore(new Date(), slotStartDateTime) && !isSameDay(new Date(), slotStartDateTime) ? false : isBefore(slotStartDateTime, new Date());
+    let mainResForCell: Reservation | undefined = undefined;
 
     if (selectedItemId === ALL_ITEMS_ID) {
         const allSlotReservations = getReservationsForSlot(day, period);
@@ -390,34 +397,34 @@ export default function WeeklyBookingCalendar({
             notes: res.notes,
             purpose: res.purpose,
             itemName: res.itemName,
+            itemId: res.itemId,
+            userId: res.userId,
         }));
 
         if (itemType === 'room') {
             const bookedItemCount = new Set(allSlotReservations.map(res => res.itemId)).size;
             const totalItemUnits = items.length; 
             let currentDisplayText = "";
-            if (isPast && bookedItemCount > 0) {
-                currentDisplayText = `${bookedItemCount} ${itemDisplayName}(s) Were Booked`;
-            } else if (isPast) {
-                currentDisplayText = "";
-            } else if (bookedItemCount === 0 && totalItemUnits > 0){
+             if (isPast) {
+                if (bookedItemCount > 0) currentDisplayText = `${bookedItemCount} ${itemDisplayName}(s) Were Booked`;
+             } else if (totalItemUnits > 0 && bookedItemCount === 0) {
                 currentDisplayText = `Available`;
-            } else if (totalItemUnits === 0) {
+             } else if (totalItemUnits === 0) {
                 currentDisplayText = `No ${itemDisplayName}s`;
-            } // Else, no display text, just the list of bookings.
+             }
             
             if (isPast) {
                 if (bookedItemCount > 0) return { status: 'past-booked-all-view', isPast: true, displayText: currentDisplayText, bookingEntries, totalItemUnits, bookedItemCount };
                 return { status: 'past-available', isPast: true, displayText: currentDisplayText , totalItemUnits, bookedItemCount};
             }
-            if (totalItemUnits > 0 && bookedItemCount >= totalItemUnits) {
-                return { status: 'all-booked', isPast: false, displayText: currentDisplayText, bookingEntries, totalItemUnits, bookedItemCount };
+            if (totalItemUnits > 0 && bookedItemCount >= totalItemUnits) { // All rooms booked
+                return { status: 'all-booked', isPast: false, displayText: "", bookingEntries, totalItemUnits, bookedItemCount };
             }
-            if (bookedItemCount > 0) {
-                 return { status: 'partially-booked', isPast: false, displayText: currentDisplayText, bookingEntries, totalItemUnits, bookedItemCount };
+            if (bookedItemCount > 0) { // Some rooms booked
+                 return { status: 'partially-booked', isPast: false, displayText: "", bookingEntries, totalItemUnits, bookedItemCount };
             }
             return { status: 'available', isPast: false, displayText: currentDisplayText, totalItemUnits, bookedItemCount };
-        } else { 
+        } else { // itemType is device (ALL_ITEMS_ID view)
             let totalPotentialUnits = 0;
             let totalBookedUnits = 0;
             items.forEach(item => { 
@@ -438,7 +445,6 @@ export default function WeeklyBookingCalendar({
                  currentDisplayText = totalPotentialUnits > 0 ? `${totalPotentialUnits} Units Available` : "No Devices";
             }
 
-
             if (isPast) {
                 if (totalBookedUnits > 0) return { status: 'past-booked-all-view', isPast: true, displayText: currentDisplayText, totalAvailableUnits, totalPotentialUnits, bookingEntries };
                 return { status: 'past-available', isPast: true, displayText: currentDisplayText, totalAvailableUnits, totalPotentialUnits };
@@ -453,6 +459,7 @@ export default function WeeklyBookingCalendar({
         }
     }
 
+    // Logic for when a specific item is selected
     const currentItem = items.find(i => i.id === selectedItemId);
     if (!currentItem) return { status: 'past-available', isPast: true, displayText: ""}; 
 
@@ -466,24 +473,27 @@ export default function WeeklyBookingCalendar({
         notes: res.notes,
         purpose: res.purpose, 
         itemName: res.itemName,
+        itemId: res.itemId,
+        userId: res.userId,
     }));
 
     const totalBookedUnits = bookingEntries.reduce((sum, entry) => sum + entry.bookedQuantity, 0);
     const itemTotalQuantity = itemType === 'device' ? (currentItem as Device).quantity : 1; 
     const availableQuantity = itemTotalQuantity - totalBookedUnits;
-    const mainUserReservation = slotReservations.find(r => r.userId === user?.uid);
+    
+    mainResForCell = slotReservations.find(r => r.userId === user?.uid) || slotReservations[0];
 
 
     if (isPast) {
-        if (bookingEntries.length > 0) return { status: 'past-booked', isPast: true, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
+        if (bookingEntries.length > 0) return { status: 'past-booked', isPast: true, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainResForCell, bookedUnits: totalBookedUnits };
         return { status: 'past-available', isPast: true, itemName: currentItem.name, displayText: "" , itemTotalQuantity, availableQuantity, bookedUnits: totalBookedUnits};
     }
 
     if (availableQuantity <= 0 && itemType === 'device') { 
-        return { status: 'all-booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
+        return { status: 'all-booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainResForCell, bookedUnits: totalBookedUnits };
     }
     if (bookingEntries.length > 0) { 
-        return { status: itemType === 'room' ? 'all-booked' : 'booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainUserReservation, bookedUnits: totalBookedUnits };
+        return { status: itemType === 'room' ? 'all-booked' : 'booked', isPast: false, bookingEntries, itemTotalQuantity, availableQuantity, mainReservation: mainResForCell, bookedUnits: totalBookedUnits };
     }
     return { status: 'available', isPast: false, itemName: currentItem.name, displayText: itemType === 'device' ? `Available (${itemTotalQuantity})` : "Available", itemTotalQuantity, availableQuantity, bookedUnits: totalBookedUnits };
   }, [selectedItemId, getReservationsForSlot, itemType, items, user, itemDisplayName]);
@@ -512,7 +522,7 @@ export default function WeeklyBookingCalendar({
             const mainUserRes = cellData.bookingEntries?.find(be => be.isCurrentUserBooking);
             const backgroundClass = mainUserRes ? 'bg-green-50' : (cellData.status === 'all-booked' ? 'bg-red-50' : itemStyling.backgroundClass); 
             const borderColorClass = cellData.status === 'all-booked' ? 'border-red-300' : itemStyling.borderClass;
-            baseClasses = cn(baseClasses, `${backgroundClass} ${borderColorClass} ${cellData.status === 'all-booked' ? '' : 'border-2'}`, (cellData.mainReservation || cellData.status !== 'all-booked') && canInteract ? "cursor-pointer" : "cursor-not-allowed");
+            baseClasses = cn(baseClasses, `${backgroundClass} ${borderColorClass} ${cellData.status === 'all-booked' ? '' : 'border-2'}`, (cellData.mainReservation || (isAdmin && cellData.bookingEntries && cellData.bookingEntries.length > 0) || cellData.status !== 'all-booked') && canInteract ? "cursor-pointer" : "cursor-not-allowed");
         } else if (cellData.status === 'available') {
             baseClasses = cn(baseClasses, "bg-background hover:bg-primary/10 border-slate-200 transition-colors duration-150", canInteract ? "cursor-pointer" : "cursor-default");
         } else if (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID) { 
@@ -552,6 +562,8 @@ export default function WeeklyBookingCalendar({
       return; 
     }
 
+    const reservationToEdit = cellData.mainReservation || (cellData.bookingEntries && cellData.bookingEntries.length > 0 ? reservations.find(r => r.id === cellData.bookingEntries![0].reservationId) : undefined);
+
     if (cellData.isPast) {
       if(cellData.bookingEntries && cellData.bookingEntries.length > 0 && (itemType === 'device' || (itemType === 'room' && selectedItemId !== ALL_ITEMS_ID))) {
         const description = itemType === 'device'
@@ -576,16 +588,18 @@ export default function WeeklyBookingCalendar({
       return;
     }
     
-    if (cellData.mainReservation && (cellData.status === 'booked' || cellData.status === 'all-booked')) {
-        if (isAdmin || cellData.mainReservation.userId === user?.uid) {
-             handleSlotAction(day, period, 'edit', cellData.mainReservation);
-        } else { 
+    if (reservationToEdit && (cellData.status === 'booked' || cellData.status === 'all-booked' || cellData.status === 'partially-booked')) {
+        if (isAdmin || reservationToEdit.userId === user?.uid) {
+             handleSlotAction(day, period, 'edit', reservationToEdit);
+        } else if (selectedItemId !== ALL_ITEMS_ID) { // If not admin and not their booking, show details for single item view
             const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}${be.devicePurposes ? ` - Purposes: ${be.devicePurposes.join(', ')}` : be.purpose ? ` - ${be.purpose}` : ''}${be.notes ? ` - Notes: ${be.notes}` : ''}`).join('; ');
             toast({ title: "Booking Details", description: `${cellData.bookingEntries && cellData.bookingEntries[0].itemName}: ${bookingDetailsString}` });
+        } else { // For "All items view", if not admin and not their booking, clicking does nothing specific for now, details are visible.
+            // Could potentially show a summary toast if needed.
         }
     } else if (cellData.status === 'available' || (cellData.status === 'partially-booked' && selectedItemId === ALL_ITEMS_ID) || (cellData.status === 'booked' && selectedItemId !== ALL_ITEMS_ID && itemType === 'device') || (cellData.status === 'all-booked' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalAvailableUnits !== undefined && cellData.totalAvailableUnits > 0) || (cellData.status === 'available' && selectedItemId === ALL_ITEMS_ID && itemType === 'device' && cellData.totalPotentialUnits !== undefined && cellData.totalPotentialUnits > 0 )) {
         handleSlotAction(day, period, 'book');
-    } else if ((cellData.status === 'all-booked' && selectedItemId !== ALL_ITEMS_ID && !(cellData.mainReservation && (isAdmin || cellData.mainReservation.userId === user?.uid)))) {
+    } else if ((cellData.status === 'all-booked' && selectedItemId !== ALL_ITEMS_ID && !(isAdmin || (reservationToEdit && reservationToEdit.userId === user?.uid)))) {
          const bookingDetailsString = cellData.bookingEntries?.map(be => `${getLastName(be.bookedBy)}${itemType === 'device' ? ` (Qty: ${be.bookedQuantity})` : ''}`).join('; ');
          const itemNameForToast = items.find(i=>i.id === selectedItemId)?.name;
          toast({ title: "Fully Booked", description: `${itemNameForToast}: ${bookingDetailsString}`, variant: "default" });
@@ -834,7 +848,9 @@ export default function WeeklyBookingCalendar({
                                                 ? getItemStyling(items.find(i => i.id === selectedItemId)!, itemType)
                                                 : (itemType === 'room' ? getRoomStyling() : getDeviceStyling());
 
-                      const showActions = cellData.mainReservation && (isAdmin || cellData.mainReservation.userId === user?.uid) && !cellData.isPast && selectedItemId !== ALL_ITEMS_ID && hoveredSlot === slotKey && !isMultiPeriodMode;
+                      const reservationForActions = cellData.mainReservation || (cellData.bookingEntries && cellData.bookingEntries.length > 0 ? reservations.find(r => r.id === cellData.bookingEntries![0].reservationId) : undefined);
+                      const showActions = reservationForActions && (isAdmin || reservationForActions.userId === user?.uid) && !cellData.isPast && hoveredSlot === slotKey && !isMultiPeriodMode;
+
                       const isSlotBookableForMultiSelect = currentSelectedItem && !cellData.isPast && (
                           (itemType === 'device' && cellData.availableQuantity !== undefined && cellData.availableQuantity > 0) ||
                           (itemType === 'room' && cellData.status === 'available')
@@ -871,16 +887,17 @@ export default function WeeklyBookingCalendar({
                             )}
                             { (cellData.status === 'booked' || cellData.status === 'all-booked') && selectedItemId !== ALL_ITEMS_ID && cellData.bookingEntries && cellData.bookingEntries.length > 0 ? (
                                <div className={cn("flex flex-col w-full h-full space-y-0.5 text-xs leading-tight", cellData.isPast ? "opacity-60" : "", isMultiPeriodMode && isSlotBookableForMultiSelect ? "pl-6" : "")}>
-                                  <div className={cn("block font-bold text-base", currentItemForStyling.textClass)}>
-                                    {cellData.bookingEntries[0].itemName}
-                                  </div>
-                                  <ul className="space-y-0.5">
+                                  
+                                  <ul className="space-y-1">
                                     {cellData.bookingEntries.map(entry => (
-                                      <li key={entry.reservationId} className={cn("pb-1 mb-1 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
+                                      <li key={entry.reservationId} className={cn("pb-1 mb-0.5 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
+                                        <div className={cn("block font-bold text-base", currentItemForStyling.textClass)}>
+                                          {entry.itemName}
+                                        </div>
                                         <div className={cn(entry.isCurrentUserBooking && "text-primary")}>{getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}</div>
-                                        {itemType === 'room' && entry.purpose && <div className="text-slate-600 text-[10px]">{entry.purpose}</div>}
-                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600 text-[10px]">{entry.devicePurposes.join(', ')}</div>}
-                                        {itemType === 'device' && entry.notes && <div className="text-slate-500 text-[10px]">Notes: {entry.notes}</div>}
+                                        {itemType === 'room' && entry.purpose && <div className="text-slate-600">{entry.purpose}</div>}
+                                        {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600">{entry.devicePurposes.join(', ')}</div>}
+                                        {itemType === 'device' && entry.notes && <div className="text-slate-500">Notes: {entry.notes}</div>}
                                       </li>
                                     ))}
                                   </ul>
@@ -897,16 +914,16 @@ export default function WeeklyBookingCalendar({
                                    <ul className="space-y-1">
                                     {cellData.bookingEntries.map(entry => {
                                         const entryRoomStyling = itemType === 'room' && entry.itemName ? getRoomStyling(entry.itemName) : undefined;
-                                        const entryDeviceStyling = itemType === 'device' && cellData.bookingEntries && cellData.bookingEntries[0] ? getDeviceStyling((items.find(i => i.id === cellData.bookingEntries![0].itemId) as Device)?.type) : undefined;
+                                        const entryDeviceStyling = itemType === 'device' && entry.itemId ? getDeviceStyling((items.find(i => i.id === entry.itemId) as Device)?.type) : undefined;
                                         const nameStyling = itemType === 'room' ? entryRoomStyling : entryDeviceStyling;
 
                                         return (
-                                        <li key={entry.reservationId} className={cn("pb-1 mb-1 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
+                                        <li key={entry.reservationId} className={cn("pb-1 mb-0.5 border-b border-slate-200 last:border-b-0", entry.isCurrentUserBooking && "font-semibold")}>
                                             <div className={cn("font-bold text-base", nameStyling?.textClass)}>{entry.itemName}</div>
                                             <div className={cn(entry.isCurrentUserBooking && "text-primary")}>{getLastName(entry.bookedBy)}{itemType === 'device' ? ` (Qty: ${entry.bookedQuantity})` : ''}</div>
-                                            {itemType === 'room' && entry.purpose && <div className="text-slate-600 text-[10px]">{entry.purpose}</div>}
-                                            {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600 text-[10px]">{entry.devicePurposes.join(', ')}</div>}
-                                            {itemType === 'device' && entry.notes && <div className="text-slate-500 text-[10px]">Notes: {entry.notes}</div>}
+                                            {itemType === 'room' && entry.purpose && <div className="text-slate-600">{entry.purpose}</div>}
+                                            {itemType === 'device' && entry.devicePurposes && entry.devicePurposes.length > 0 && <div className="text-slate-600">{entry.devicePurposes.join(', ')}</div>}
+                                            {itemType === 'device' && entry.notes && <div className="text-slate-500">Notes: {entry.notes}</div>}
                                         </li>
                                         );
                                     })}
@@ -928,18 +945,18 @@ export default function WeeklyBookingCalendar({
                                 </div>
                             )}
 
-                            {showActions && cellData.mainReservation && (
+                            {showActions && reservationForActions && (
                                 <div className="absolute top-1 right-1 flex items-center space-x-0.5 opacity-0 group-hover/cell:opacity-100 transition-opacity duration-150">
                                     <Button
                                       variant="ghost" size="icon" className="h-6 w-6 p-1 hover:bg-blue-100 rounded"
-                                      onClick={(e) => { e.stopPropagation(); cellData.mainReservation && handleSlotAction(day, period, 'edit', cellData.mainReservation); }}
-                                      aria-label="Edit booking"
+                                      onClick={(e) => { e.stopPropagation(); reservationForActions && handleSlotAction(day, period, 'edit', reservationForActions); }}
+                                      aria-label={`Edit booking for ${reservationForActions.itemName}`}
                                       disabled={isSlotProcessing || isProcessingGlobal}
                                     > <Edit2 className="h-3.5 w-3.5 text-blue-500" /> </Button>
                                     <Button
                                       variant="ghost" size="icon" className="h-6 w-6 p-1 hover:bg-red-100 rounded"
-                                      onClick={(e) => { e.stopPropagation(); cellData.mainReservation && onDeleteSlot(cellData.mainReservation.id); }}
-                                      aria-label="Delete booking"
+                                      onClick={(e) => { e.stopPropagation(); reservationForActions && onDeleteSlot(reservationForActions.id); }}
+                                      aria-label={`Delete booking for ${reservationForActions.itemName}`}
                                       disabled={isSlotProcessing || isProcessingGlobal}
                                     > <Trash2 className="h-3.5 w-3.5 text-red-500" /> </Button>
                                 </div>
@@ -1214,4 +1231,3 @@ export default function WeeklyBookingCalendar({
     </Card>
   );
 }
-
